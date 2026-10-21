@@ -18,7 +18,8 @@
 #                                            release-windows.yml run RUN_ID's Setup.exe -> dist/
 #   scripts/ship.sh [APP] verify             the binary starts on clean Arch, Ubuntu 24.04, and Fedora; the
 #                                            installer works there; latest.json matches dist/
-#   scripts/ship.sh [APP] upload [--dry-run] tarballs, DMG, Setup.exe, checksums, latest.json -> Cloudflare R2
+#   scripts/ship.sh [APP] upload [--dry-run] tarballs, DMG, Setup.exe, checksums, latest.json and its
+#                                            signature -> Cloudflare R2
 #   scripts/ship.sh [APP] site   [--dry-run] the app's download page and installers (sites/APP) -> Cloudflare Pages
 #   scripts/ship.sh suite-site [--dry-run]   suite page and the suite's installers (sites/cronkite) -> Cloudflare Pages
 #   scripts/ship.sh video [--dry-run]        the explainer's English cuts (dist/video/, from
@@ -29,7 +30,10 @@
 # Brick's release sits at the bucket's root (latest.json, releases/), the other apps' under
 # their name (slate/, frame/, etch/). A release is the Linux tarball and, when built, the
 # macOS tarball and DMG and the Windows Setup.exe beside it; latest.json lists each platform
-# (scripts/release_json.py).
+# (scripts/release_json.py), and latest.json.sig is its Ed25519 signature, made with the
+# private key at CRONKITE_RELEASE_KEY, which lives outside the repository (ADR 0012;
+# scripts/release_key.py). Without it latest.json is written unsigned, and verify and
+# upload refuse it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -87,14 +91,15 @@ wr() { npx --yes wrangler@4 "$@"; }
 base() { echo "$DOWNLOAD_BASE_URL${PREFIX:+/${PREFIX%/}}"; }
 sha256_of() { python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$1"; }
 # Write $OUT/latest.json from the release files in dist/ (scripts/release_json.py has its
-# shape: each platform under "platforms", then Linux's fields at the top level, last). Needs
-# the Linux tarball: until it's built, nothing is written.
+# shape: each platform under "platforms", then Linux's fields at the top level, last), and
+# $OUT/latest.json.sig when CRONKITE_RELEASE_KEY is set. Needs the Linux tarball: until it's
+# built, nothing is written.
 latest() {
   need DOWNLOAD_BASE_URL
   if [ ! -f "$TAR" ]; then echo "latest.json waits for the Linux tarball (scripts/ship.sh $APP build)"; return 0; fi
   mkdir -p "$OUT"
-  python3 scripts/release_json.py write "$(base)/releases/v$V" "$V" "$TAR" "$MAC_TAR" "$MAC_DMG" "$WIN_SETUP" > "$OUT/latest.json"
-  echo "$OUT/latest.json: $APP $V for $(python3 -c 'import json, sys; print(", ".join(json.load(open(sys.argv[1]))["platforms"]))' "$OUT/latest.json")"
+  python3 scripts/release_json.py write "$APP" "$(base)/releases/v$V" "$V" "$TAR" "$MAC_TAR" "$MAC_DMG" "$WIN_SETUP" "$OUT/latest.json"
+  echo "$OUT/latest.json: $APP $V for $(python3 -c 'import json, sys; print(", ".join(json.load(open(sys.argv[1]))["platforms"]))' "$OUT/latest.json")$([ -f "$OUT/latest.json.sig" ] && echo ", signed")"
 }
 # Build on GitHub: run release-$1.yml (macos or windows) for APP at HEAD, which must be on
 # GitHub already (pushing is the user's call), wait for it, then fetch-$1 its artifact.
@@ -243,6 +248,9 @@ verify)
 upload)
   need CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID R2_BUCKET DOWNLOAD_BASE_URL
   [ -f "$TAR" ] || { echo "run build first"; exit 1; }
+  # Signed and matching dist/ before anything leaves the machine.
+  latest
+  python3 scripts/release_json.py check "$OUT/latest.json" dist
   run wr r2 object put "$R2_BUCKET/${PREFIX}releases/v$V/$NAME.tar.gz" --file "$TAR" --content-type application/gzip --remote
   run wr r2 object put "$R2_BUCKET/${PREFIX}releases/v$V/$NAME.tar.gz.sha256" --file "$TAR.sha256" --content-type text/plain --remote
   if [ -f "$MAC_TAR" ] && [ -f "$MAC_DMG" ]; then
@@ -259,9 +267,10 @@ upload)
   else
     echo "no Windows build in dist/ ($WIN_NAME; build --windows or fetch-windows)"
   fi
-  # Last, so it never names a file that isn't there yet.
-  latest
+  # Last, so they never name a file that isn't there yet. A client that reads the new
+  # latest.json beside the old signature refuses the pair and tries again at its next start.
   run wr r2 object put "$R2_BUCKET/${PREFIX}latest.json" --file "$OUT/latest.json" --content-type application/json --remote
+  run wr r2 object put "$R2_BUCKET/${PREFIX}latest.json.sig" --file "$OUT/latest.json.sig" --content-type text/plain --remote
   echo "check: curl -fsSI $(base)/releases/v$V/$NAME.tar.gz"
   if [ -f "$MAC_DMG" ]; then echo "check: curl -fsSI $(base)/releases/v$V/$MAC_NAME.dmg"; fi
   if [ -f "$WIN_SETUP" ]; then echo "check: curl -fsSI $(base)/releases/v$V/$WIN_NAME"; fi

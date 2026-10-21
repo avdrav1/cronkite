@@ -99,13 +99,15 @@ Show the user what will happen in this shape and wait for a clear yes:
 
 ```
 Ready to ship vX.Y.Z
-- Upload <app>-X.Y.Z-x86_64-linux.tar.gz (N MB), <app>-X.Y.Z-arm64-macos.tar.gz (N MB) and .dmg (N MB), <app>-X.Y.Z-x86_64-windows-setup.exe (N MB) + checksums + latest.json to R2 bucket <bucket>/<prefix>
+- Upload <app>-X.Y.Z-x86_64-linux.tar.gz (N MB), <app>-X.Y.Z-arm64-macos.tar.gz (N MB) and .dmg (N MB), <app>-X.Y.Z-x86_64-windows-setup.exe (N MB) + checksums + latest.json and its signature to R2 bucket <bucket>/<prefix>
 - Deploy download page to Pages project <project>
 - Tag vX.Y.Z locally
 Proceed?
 ```
 
 A release without the macOS or Windows files (`upload` says "no macOS build in dist/" or "no Windows build in dist/") still ships; its `latest.json` then has no `macos-arm64` or `windows-x86_64`, the Mac installer and `install.ps1` say there's no release for them yet, and the page lists the platform as not in this release yet.
+
+`latest.json` is signed (ADR 0012): `upload` signs it with the private key at `CRONKITE_RELEASE_KEY` (in `.env.ship`; outside the repository; `CRONKITE_RELEASE_KEY_PASS` if it's encrypted) and runs `release_json.py check` before anything leaves the machine, so an unsigned or mis-signed release stops there ("latest.json.sig missing: unsigned", "isn't the private half of any key in packaging/release-keys"). The dry run's last two lines put `latest.json` and `latest.json.sig`. If the key is missing, ask the user for it; never make a new key pair for a release: the apps trust only `packaging/release-keys/release-1.pub` and `release-2.pub`.
 
 ## 5. Ship
 

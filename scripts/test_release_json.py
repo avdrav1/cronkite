@@ -1,14 +1,19 @@
-"""Tests for release_json.py. Run: python3 -m unittest discover -s scripts"""
+"""Tests for release_json.py and release_key.py. Run: python3 -m unittest discover -s scripts"""
 import hashlib
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import release_json  # noqa: E402
+import release_key  # noqa: E402
 
 URL = "https://dl.example.com/slate/releases/v1.2.3"
 
@@ -30,7 +35,7 @@ class LatestJson(unittest.TestCase):
         return self.dist / name
 
     def release(self):
-        return release_json.release(URL, "1.2.3", str(self.linux), str(self.mac_tar), str(self.mac_dmg),
+        return release_json.release("slate", URL, "1.2.3", str(self.linux), str(self.mac_tar), str(self.mac_dmg),
                                     str(self.setup), "2026-10-16")
 
     def test_every_platform_with_linux_at_the_top_level_last(self):
@@ -38,7 +43,8 @@ class LatestJson(unittest.TestCase):
         self.put(self.mac_dmg.name, b"mac dmg")
         self.put(self.setup.name, b"MZ setup")
         rel = self.release()
-        self.assertEqual(list(rel), ["platforms", "version", "date", "url", "sha256", "bytes"])
+        self.assertEqual(list(rel), ["app", "platforms", "version", "date", "url", "sha256", "bytes"])
+        self.assertEqual(rel["app"], "slate")
         self.assertEqual(list(rel["platforms"]), ["linux-x86_64", "macos-arm64", "windows-x86_64"])
         # install.ps1 reads exactly these three (WIN-5).
         self.assertEqual(rel["platforms"]["windows-x86_64"], {
@@ -90,6 +96,109 @@ class LatestJson(unittest.TestCase):
         other = dict(rel, version="1.2.4")
         self.assertEqual(release_json.check(other, str(self.dist)),
                          [f"linux-x86_64: {rel['url']} isn't in v1.2.4's folder"])
+
+    def test_check_wants_the_apps_own_files(self):
+        rel = self.release()
+        self.assertEqual(release_json.check(dict(rel, app="brick"), str(self.dist)),
+                         [f"linux-x86_64: {rel['url']} isn't brick's"])
+        del rel["app"]
+        self.assertEqual(release_json.check(rel, str(self.dist)), ["no app"])
+
+
+def _ed25519():
+    return shutil.which("openssl") is not None and subprocess.run(
+        ["openssl", "genpkey", "-algorithm", "ed25519"], capture_output=True).returncode == 0
+
+
+@unittest.skipUnless(_ed25519(), "needs openssl with Ed25519 (OpenSSL 3)")
+class Signature(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        tmp = Path(self.dir.name)
+        self.dist, self.keys, self.private = tmp / "dist", tmp / "release-keys", tmp / "private"
+        self.dist.mkdir()
+        self.key, _ = release_key.new(self.private, "release-1", self.keys)
+        self.key2, _ = release_key.new(self.private, "release-2", self.keys)
+        linux = self.dist / "slate-1.2.3-x86_64-linux.tar.gz"
+        linux.write_bytes(b"linux tarball")
+        self.rel = release_json.release("slate", URL, "1.2.3", str(linux), "", "", "", "2026-10-21")
+        self.out = self.dist / "latest.json"
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_a_signed_release_verifies_with_either_release_key(self):
+        for key, name in ((self.key, "release-1"), (self.key2, "release-2")):
+            self.assertTrue(release_json.write(self.rel, self.out, str(key), self.keys))
+            data = self.out.read_bytes()
+            self.assertEqual(json.loads(data), self.rel)
+            self.assertEqual(release_key.verifies(data, Path(f"{self.out}.sig").read_text(), self.keys), name)
+            self.assertEqual(release_json.check_signature(self.out, self.keys), [])
+
+    def test_a_tampered_byte_fails(self):
+        release_json.write(self.rel, self.out, str(self.key), self.keys)
+        data = bytearray(self.out.read_bytes())
+        data[data.index(b"1.2.3")] = ord("9")
+        self.out.write_bytes(bytes(data))
+        self.assertEqual(release_json.check_signature(self.out, self.keys),
+                         [f"{self.out}.sig doesn't verify with any key in {self.keys}"])
+
+    def test_another_key_neither_signs_nor_verifies(self):
+        stranger, _ = release_key.new(self.private, "stranger", Path(self.dir.name) / "elsewhere")
+        with self.assertRaisesRegex(release_key.KeyProblem, "isn't the private half of any key"):
+            release_json.write(self.rel, self.out, str(stranger), self.keys)
+        self.assertFalse(self.out.exists())
+        # A signature made with it, put beside the manifest by someone else.
+        release_json.write(self.rel, self.out, None, self.keys)
+        Path(f"{self.out}.sig").write_text(release_key.sign(str(stranger), self.out.read_bytes()))
+        self.assertEqual(release_json.check_signature(self.out, self.keys),
+                         [f"{self.out}.sig doesn't verify with any key in {self.keys}"])
+
+    def test_unsigned_drops_a_stale_signature_and_check_fails(self):
+        release_json.write(self.rel, self.out, str(self.key), self.keys)
+        self.assertFalse(release_json.write(dict(self.rel, date="2026-10-22"), self.out, None, self.keys))
+        self.assertFalse(Path(f"{self.out}.sig").exists())
+        self.assertEqual(release_json.check_signature(self.out, self.keys),
+                         [f"{self.out}.sig missing: unsigned (set CRONKITE_RELEASE_KEY and write it again)"])
+
+    def test_a_key_inside_the_repository_is_refused(self):
+        inside = release_key.ROOT / "target" / "release-test.key"
+        inside.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(self.key, inside)
+        try:
+            with self.assertRaisesRegex(release_key.KeyProblem, "inside the repository"):
+                release_key.sign(str(inside), b"x")
+        finally:
+            inside.unlink()
+        with self.assertRaisesRegex(release_key.KeyProblem, "inside the repository"):
+            release_key.new(release_key.ROOT / "target" / "keys", "release-3", self.keys)
+        self.assertFalse((release_key.ROOT / "target" / "keys").exists())
+
+    def test_an_encrypted_key_signs_with_its_passphrase(self):
+        with mock.patch.dict(os.environ, {release_key.PASS: "correct horse"}):
+            key, _ = release_key.new(self.private, "release-3", self.keys)
+            self.assertTrue(release_json.write(self.rel, self.out, str(key), self.keys))
+        self.assertIn(b"ENCRYPTED", key.read_bytes())
+        with mock.patch.dict(os.environ, {release_key.PASS: "wrong"}):
+            with self.assertRaisesRegex(release_key.KeyProblem, "can't sign"):
+                release_key.sign(str(key), b"x")
+
+    def test_the_cli_signs_only_with_a_release_key_and_checks_against_them(self):
+        # The CLI uses the repository's keys (packaging/release-keys), which this test key isn't.
+        script = str(Path(release_json.__file__))
+        args = [sys.executable, script, "write", "slate", URL, "1.2.3", str(self.dist / "slate-1.2.3-x86_64-linux.tar.gz"),
+                "none", "none", "none", str(self.out)]
+        r = subprocess.run(args, env=dict(os.environ, CRONKITE_RELEASE_KEY=str(self.key)), capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stderr.strip()),
+                         (1, f"release_json: {self.key} isn't the private half of any key in {release_key.KEYS}"))
+        self.assertFalse(self.out.exists())
+        env = {k: v for k, v in os.environ.items() if k != "CRONKITE_RELEASE_KEY"}
+        r = subprocess.run(args, env=env, capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stderr.strip()),
+                         (0, f"release_json: {self.out} is unsigned (CRONKITE_RELEASE_KEY not set)"))
+        r = subprocess.run([sys.executable, script, "check", str(self.out), str(self.dist)], capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stdout.strip()),
+                         (1, f"FAIL {self.out}: {self.out}.sig missing: unsigned (set CRONKITE_RELEASE_KEY and write it again)"))
 
 
 if __name__ == "__main__":
