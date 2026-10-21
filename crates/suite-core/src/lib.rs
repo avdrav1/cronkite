@@ -58,6 +58,18 @@ impl AppKind {
             AppKind::Etch => "dev.cronkite.Etch",
         }
     }
+
+    /// Where its releases are published: the folder holding `latest.json`, its signature,
+    /// and `releases/` (ADR 0012). Brick's is the bucket's root, the others' under their
+    /// command.
+    pub const fn release_url(self) -> &'static str {
+        match self {
+            AppKind::Brick => "https://dl.cronkite.cc",
+            AppKind::Slate => "https://dl.cronkite.cc/slate",
+            AppKind::Frame => "https://dl.cronkite.cc/frame",
+            AppKind::Etch => "https://dl.cronkite.cc/etch",
+        }
+    }
 }
 
 impl fmt::Display for AppKind {

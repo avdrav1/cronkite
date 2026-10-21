@@ -1,0 +1,34 @@
+[package]
+name = "suite-update"
+description = "The suite's apps updating themselves: check, verify, download, and stage (ADR 0012)"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+# Trust the test key in test-key/ beside the release keys, for the update checks that
+# serve a release signed with it (UPD-4 to UPD-6). Release builds never enable it.
+test-key = []
+
+[dependencies]
+suite-core.workspace = true
+suite-platform.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# HTTPS through rustls on ring, certificates checked by the system (ADR 0012).
+ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "platform-verifier"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+# Ed25519 signatures and SHA-256; base64 for the signature and the keys' PEM files.
+ring = "0.17"
+base64 = "0.23"
+
+[lints]
+workspace = true
+
+[lib]
+# `cargo bench` runs only apps/brick/benches/corpus.rs (BENCH-1).
+bench = false

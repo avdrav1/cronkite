@@ -202,6 +202,10 @@ fn main() -> glib::ExitCode {
     // macOS and Windows: the system's light or dark mode (GTK doesn't follow the Mac's).
     #[cfg(any(target_os = "macos", windows))]
     app.connect_startup(|_| suite_platform::appearance::follow(suite_ui::appearance::set_dark));
+    // Check for an update once the first window shows (ADR 0012).
+    app.connect_window_added(|_, window| {
+        window.connect_map(|_| suite_update::start(APP, env!("CARGO_PKG_VERSION")));
+    });
     app.connect_startup(|app| {
         // The settings portal (Linux; on macOS it finds none). Windows has no portal, and
         // asking would start a D-Bus session bus (DEC-11 R13).

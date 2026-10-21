@@ -129,6 +129,10 @@ fn main() -> glib::ExitCode {
     // macOS and Windows: the system's light or dark mode (GTK doesn't follow the Mac's).
     #[cfg(any(target_os = "macos", windows))]
     app.connect_startup(|_| suite_platform::appearance::follow(suite_ui::appearance::set_dark));
+    // Check for an update once the first window shows (ADR 0012).
+    app.connect_window_added(|_, window| {
+        window.connect_map(|_| suite_update::start(APP, env!("CARGO_PKG_VERSION")));
+    });
     app.connect_startup(window::install_app_actions);
     // Files, from the command line or the system (Finder), each open in their own window
     // (`suite_ui::launch`); a benchmark's window opens on `activate`.

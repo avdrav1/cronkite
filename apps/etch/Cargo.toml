@@ -13,6 +13,7 @@ suite-core.workspace = true
 suite-ui.workspace = true
 suite-platform.workspace = true
 suite-file.workspace = true
+suite-update.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 image-model.workspace = true

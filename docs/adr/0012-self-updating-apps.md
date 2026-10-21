@@ -39,6 +39,7 @@ The user asked for the apps to update themselves at startup. Decisions (2026-10-
    - The curl and PowerShell installers keep their sha256 check. They run once, by hand, from HTTPS.
 3. **HTTP and crypto:**
    - `ureq` with `rustls` on `ring`, and the operating system's certificate store (`rustls-native-certs`). It's pure Rust, the same on all three platforms, needs no OpenSSL, and every crate's licence is already on `rust_licenses.py`'s allowlist (MIT, Apache-2.0, ISC).
+     - *Amended by UPD-2 (2026-10-21):* the system's own verifier, through `rustls-platform-verifier` (ureq's `platform-verifier`): on Linux the system's certificates (`rustls-native-certs`), on macOS Security.framework, on Windows CryptoAPI, which also check revocation there. No `webpki-roots` (its licence, CDLA-Permissive-2.0, isn't on the allowlist). `untrusted`'s ISC text is written as source comments, which `rust_licenses.py` now reads.
    - `ring` also verifies the Ed25519 signature and computes SHA-256, so the suite carries one crypto library.
    - Rejected: shelling out to `curl` (not on every Linux install, and its errors arrive as text); GIO's TLS (needs glib-networking, which isn't bundled on macOS or Windows).
 4. **Applying, per platform.**

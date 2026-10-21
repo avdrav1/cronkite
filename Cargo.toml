@@ -11,6 +11,7 @@ members = [
     "crates/suite-ui",
     "crates/suite-platform",
     "crates/suite-file",
+    "crates/suite-update",
     # Brick-only crates
     "apps/brick/crates/csv-engine",
     "apps/brick/crates/formula",
@@ -49,6 +50,7 @@ suite-core = { path = "crates/suite-core" }
 suite-ui = { path = "crates/suite-ui" }
 suite-platform = { path = "crates/suite-platform" }
 suite-file = { path = "crates/suite-file" }
+suite-update = { path = "crates/suite-update" }
 # Brick crates
 csv-engine = { path = "apps/brick/crates/csv-engine" }
 data-model = { path = "apps/brick/crates/data-model" }

@@ -147,8 +147,10 @@ def alternatives(expr):
 
 
 def text_licences(text):
-    """The allowlisted licences whose text `text` is."""
-    flat = " ".join(text.lower().split())
+    """The allowlisted licences whose text `text` is, also when it's written as source
+    comments (`// Permission to use, …`, as untrusted's LICENSE.txt is)."""
+    uncommented = "\n".join(re.sub(r"^\s*(?://+|#+|\*+|/\*+)", "", line) for line in text.splitlines())
+    flat = " ".join(uncommented.lower().split())
     return {lic for lic, patterns in TEXT.items() if all(re.search(p, flat) for p in patterns)}
 
 

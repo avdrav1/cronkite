@@ -53,7 +53,6 @@
 
 #[cfg(any(target_os = "macos", all(test, unix)))]
 use std::ffi::OsString;
-#[cfg(any(target_os = "macos", windows, test))]
 use std::path::Path;
 use std::path::PathBuf;
 use suite_core::AppKind;
@@ -83,6 +82,22 @@ pub fn init(app: AppKind) -> Result<Option<PathBuf>, String> {
 #[cfg(not(any(target_os = "macos", windows)))]
 pub fn init(_app: AppKind) -> Result<Option<PathBuf>, String> {
     Ok(None)
+}
+
+/// The folder a self-contained install of the program at `exe` lives in: the `<Name>.app`
+/// bundle on macOS, the install folder on Windows (see the module docs). `None` for a build
+/// that isn't one (`target/`, MAC-5's minimal bundles), and always on Linux, whose
+/// installer puts a single binary in `~/.local/bin`.
+pub fn install_root(exe: &Path) -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    return contents_of(exe).and_then(|c| c.parent().map(Path::to_path_buf));
+    #[cfg(windows)]
+    return root_of(exe);
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = exe;
+        None
+    }
 }
 
 /// The install folder for an executable at `exe`, when that's a self-contained Windows

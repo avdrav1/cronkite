@@ -59,6 +59,13 @@ class Texts(unittest.TestCase):
             "Licensed under the Apache License, Version 2.0 or the MIT license, at your option."), set(),
             "a COPYRIGHT file naming licences is no licence text")
 
+    def test_a_text_written_as_comments_counts(self):
+        isc = ("// Copyright 2015-2016 Brian Smith.\n//\n"
+               "// Permission to use, copy, modify, and/or distribute this software for any\n"
+               "// purpose with or without fee is hereby granted, provided that the above\n"
+               "// copyright notice and this permission notice appear in all copies.\n")
+        self.assertEqual(rust_licenses.text_licences(isc), {"ISC"})
+
     def test_texts_print_without_trailing_space_or_surrounding_blank_lines(self):
         self.assertEqual(rust_licenses.normalise("\r\n\nMIT  \r\nline\t\n\n"), "MIT\nline")
 
