@@ -23,7 +23,7 @@ CHAINS = {
     "slate": ["SL0", "SL1", "SL3", "SL2", "SL4"],
     "frame": ["FR0", "FR1"],
     "etch": ["ET0", "ET1", "ET2", "ET3"],
-    "suite": ["XP0", "XP1", "XP2"],
+    "suite": ["XP0", "XP1", "XP2", "UP0"],
 }
 MILESTONES = [ms for chain in CHAINS.values() for ms in chain]
 STATUSES = {"todo", "in-progress", "review", "done", "blocked"}
