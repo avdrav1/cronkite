@@ -2,6 +2,55 @@
 
 Releases are added by the ship-it skill.
 
+## Etch v0.5.0 (2026-10-24)
+
+Etch now updates itself. When it starts, it checks for a newer release, downloads it in the background, and runs it from the next start (on Linux the new version is installed at once; on a Mac and on Windows when the last Etch window is closed), then says "Updated to Etch X.Y.Z" once. It only installs releases signed with Cronkite's key, so a tampered download is refused. To turn it off, uncheck Update Automatically (Help on Linux, the Etch menu on a Mac, Help on Windows), or set `CRONKITE_NO_UPDATE=1` for one run. **Copies installed before this release can't update themselves: run the install command once more** (`curl -fsSL https://etch.cronkite.cc/install.sh | sh`, or `irm https://etch.cronkite.cc/install.ps1 | iex` on Windows); from then on updates arrive by themselves.
+
+- DEC-12: Apps that update themselves (ADR 0012)
+- UPD-1: Sign each release's latest.json with Cronkite's release key
+- UPD-2: Check, verify, download, and stage updates at startup
+- UPD-3: Update Automatically next to About, and the one-time "Updated to Etch" notice
+- UPD-4: Apply updates on Linux
+- UPD-5: Apply updates on macOS
+- UPD-6: Apply updates on Windows
+
+## Frame v0.4.0 (2026-10-24)
+
+Frame now updates itself. When it starts, it checks for a newer release, downloads it in the background, and runs it from the next start (on Linux the new version is installed at once; on a Mac and on Windows when the last Frame window is closed), then says "Updated to Frame X.Y.Z" once. It only installs releases signed with Cronkite's key, so a tampered download is refused. To turn it off, uncheck Update Automatically (the ☰ main menu on Linux, the Frame menu on a Mac, Help on Windows), or set `CRONKITE_NO_UPDATE=1` for one run. **Copies installed before this release can't update themselves: run the install command once more** (`curl -fsSL https://frame.cronkite.cc/install.sh | sh`, or `irm https://frame.cronkite.cc/install.ps1 | iex` on Windows); from then on updates arrive by themselves.
+
+- DEC-12: Apps that update themselves (ADR 0012)
+- UPD-1: Sign each release's latest.json with Cronkite's release key
+- UPD-2: Check, verify, download, and stage updates at startup
+- UPD-3: Update Automatically next to About, and the one-time "Updated to Frame" notice
+- UPD-4: Apply updates on Linux
+- UPD-5: Apply updates on macOS
+- UPD-6: Apply updates on Windows
+
+## Slate v0.6.0 (2026-10-24)
+
+Slate now updates itself. When it starts, it checks for a newer release, downloads it in the background, and runs it from the next start (on Linux the new version is installed at once; on a Mac and on Windows when the last Slate window is closed), then says "Updated to Slate X.Y.Z" once. It only installs releases signed with Cronkite's key, so a tampered download is refused. To turn it off, uncheck Update Automatically (the ☰ main menu on Linux, the Slate menu on a Mac, Help on Windows), or set `CRONKITE_NO_UPDATE=1` for one run. **Copies installed before this release can't update themselves: run the install command once more** (`curl -fsSL https://slate.cronkite.cc/install.sh | sh`, or `irm https://slate.cronkite.cc/install.ps1 | iex` on Windows); from then on updates arrive by themselves.
+
+- DEC-12: Apps that update themselves (ADR 0012)
+- UPD-1: Sign each release's latest.json with Cronkite's release key
+- UPD-2: Check, verify, download, and stage updates at startup
+- UPD-3: Update Automatically next to About, and the one-time "Updated to Slate" notice
+- UPD-4: Apply updates on Linux
+- UPD-5: Apply updates on macOS
+- UPD-6: Apply updates on Windows
+
+## v0.6.0 (2026-10-24)
+
+Brick now updates itself. When it starts, it checks for a newer release, downloads it in the background, and runs it from the next start (on Linux the new version is installed at once; on a Mac and on Windows when the last Brick window is closed), then says "Updated to Brick X.Y.Z" once. It only installs releases signed with Cronkite's key, so a tampered download is refused. To turn it off, uncheck Update Automatically (the ☰ main menu on Linux, the Brick menu on a Mac, Help on Windows), or set `CRONKITE_NO_UPDATE=1` for one run. **Copies installed before this release can't update themselves: run the install command once more** (`curl -fsSL https://brick.cronkite.cc/install.sh | sh`, or `irm https://brick.cronkite.cc/install.ps1 | iex` on Windows); from then on updates arrive by themselves.
+
+- DEC-12: Apps that update themselves (ADR 0012)
+- UPD-1: Sign each release's latest.json with Cronkite's release key
+- UPD-2: Check, verify, download, and stage updates at startup
+- UPD-3: Update Automatically next to About, and the one-time "Updated to Brick" notice
+- UPD-4: Apply updates on Linux
+- UPD-5: Apply updates on macOS
+- UPD-6: Apply updates on Windows
+- APP-7: A damaged crash-recovery journal is refused instead of stopping Brick
+
 ## Etch v0.4.0 (2026-10-17)
 
 Etch runs on Windows 10 and 11 (64-bit) as a preview: install it for your user, without admin rights, with `irm https://etch.cronkite.cc/install.ps1 | iex` in PowerShell or the Setup.exe. It has Windows' own title bar with a menu bar under it, follows Windows' light and dark mode, opens images from Explorer's Open with and by drag and drop, keeps its settings in `%APPDATA%` and its recovery in `%LOCALAPPDATA%`, and uninstalls from Settings → Apps. The Setup.exe isn't signed yet, so a browser download meets SmartScreen once (More info → Run anyway). On every platform, a file dragged onto a window opens even when the drag's last move crosses into another part of it.
