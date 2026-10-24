@@ -100,7 +100,7 @@ pub fn others_running(updates: &Path) -> bool {
     })
 }
 
-const APPLIED: &str = "applied";
+pub(crate) const APPLIED: &str = "applied";
 
 /// Record that `version` has been applied (or handed to the installer that applies it),
 /// for [`notice`] at its first start.
