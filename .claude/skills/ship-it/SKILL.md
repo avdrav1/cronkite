@@ -66,6 +66,8 @@ scripts/ship.sh <app> verify   # starts the binary on clean Arch, Ubuntu 24.04, 
 
 Check the output: tarball exists, size is plausible, `dist/<name>/<app> --version` prints the new version, and `verify` ends with `RELEASE OK` and `INSTALL OK`. Stop on any FAIL. Report size and sha256.
 
+The apps update themselves (ADR 0012): every installed copy downloads a newer release's file named in the signed `latest.json` at its next start and applies it (Linux at once, macOS and Windows when the last instance quits), then says "Updated to <App> X.Y.Z" once. So a release reaches everyone without them doing anything, and a broken one does too: there's no rollback but a newer release. Before building a release, the update checks must be green at the release commit: `scripts/check_update.sh` (Linux, Docker), and on GitHub `update-macos.yml` and `update-windows.yml` (`gh workflow run update-macos.yml --ref main`, likewise Windows; both run on pushes that change `crates/suite-update`). They install an old test-key build with the real installer, serve a newer one signed with the test key, and check it arrives, with tampered releases refused. `verify` (and `build --macos`/`--windows` on their runners) runs `release_key.py trusts` on each platform's program: it must carry both release keys and never the test key (a `--features suite-update/test-key` build), so a test build can't ship.
+
 Every release carries `THIRD-PARTY-RUST.txt` (PKG-6, `scripts/rust_licenses.py`): each Rust crate compiled into the app for that platform, its licence, and the licence texts. `build` prints the crate count and the licences used, and fails on a crate without a licence text or with a licence outside the script's allowlist (`ALLOWED`: MIT, Apache-2.0, BSD, ISC, Zlib, 0BSD, Unicode, BSL-1.0, CC0-1.0, Unlicense, MPL-2.0; never GPL, AGPL, or LGPL). If a dependency update trips it, stop and tell the user which crate and licence; don't widen the allowlist without their yes. The Linux installer puts the notice and the app's LICENSE files in `~/.local/share/doc/<app>/`; the Mac bundle has it in `Contents/Resources/licenses/`.
 
 Then the macOS build. It runs on GitHub at the release commit, so that commit must be on GitHub first: ask before pushing it (`git push origin main`; the tag comes later).
@@ -108,6 +110,15 @@ Proceed?
 A release without the macOS or Windows files (`upload` says "no macOS build in dist/" or "no Windows build in dist/") still ships; its `latest.json` then has no `macos-arm64` or `windows-x86_64`, the Mac installer and `install.ps1` say there's no release for them yet, and the page lists the platform as not in this release yet.
 
 `latest.json` is signed (ADR 0012): `upload` signs it with the private key at `CRONKITE_RELEASE_KEY` (in `.env.ship`; outside the repository; `CRONKITE_RELEASE_KEY_PASS` if it's encrypted) and runs `release_json.py check` before anything leaves the machine, so an unsigned or mis-signed release stops there ("latest.json.sig missing: unsigned", "isn't the private half of any key in packaging/release-keys"). The dry run's last two lines put `latest.json` and `latest.json.sig`. If the key is missing, ask the user for it; never make a new key pair for a release: the apps trust only `packaging/release-keys/release-1.pub` and `release-2.pub`.
+
+The keys: `release-1` signs every release (`CRONKITE_RELEASE_KEY` points at it). `release-2` is the offline backup: kept off this machine (an encrypted copy on removable media or a password manager, `openssl pkey -in release-2.key -aes-256-cbc -out release-2.key.enc`), used only when `release-1` is lost or leaked. Every app trusts both, so either one's signature is believed. Neither key ever goes into the repository, CI, or chat. If `release-1` is lost or leaked, with the user:
+
+1. Fetch `release-2` from its offline place and point `CRONKITE_RELEASE_KEY` at it (`CRONKITE_RELEASE_KEY_PASS` if encrypted).
+2. Make the next backup: `python3 scripts/release_key.py new <offline folder> release-3` (it writes `packaging/release-keys/release-3.pub`). If `release-1` leaked, delete `packaging/release-keys/release-1.pub` so new builds stop trusting it; `trusts` then wants `release-2` and `release-3`.
+3. Ship a release of every app signed with `release-2`. Installed copies believe it (they trust `release-2`) and, once updated, trust `release-2` and `release-3` only.
+4. `release-2` signs from then on; `release-3` goes offline as the backup. If both keys are ever lost, installed copies can't be updated: every user reinstalls by hand.
+
+The first release with the updater (UP0) goes to copies that have none: its CHANGELOG entry and each download page say to run the installer once more, after which updates arrive by themselves.
 
 ## 5. Ship
 
