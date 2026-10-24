@@ -37,7 +37,7 @@ case $EXPECT_UPDATE in 0 | 1) ;; *) echo "EXPECT_UPDATE is 0 or 1, not $EXPECT_U
 declare -A FROM=([brick]=${FROM_BRICK:-0.6.0} [slate]=${FROM_SLATE:-0.6.0} [frame]=${FROM_FRAME:-0.4.0} [etch]=${FROM_ETCH:-0.5.0})
 work=target/check-update-live
 site=$work/site
-rm -rf "$site" "$work/shots"
+rm -rf "$site" "$work/shots" "$work/linux.out"
 mkdir -p "$site" "$work/shots"
 
 # What the apps check: each one's live latest.json (suite-core's AppKind::release_url).
@@ -233,6 +233,6 @@ if [ -n "${SHOTS:-}" ]; then
 fi
 if [ $fail = 0 ] && [ "${total:-0}" -gt 0 ]; then echo "check_update_live: OK ($total checks)"; else
   echo "check_update_live: FAILED"
-  [ -n "${VERBOSE:-}" ] || echo "(VERBOSE=1 for the transcript; $work/linux.out)"
+  [ -n "${VERBOSE:-}" ] || [ ! -f "$work/linux.out" ] || echo "(VERBOSE=1 for the transcript; $work/linux.out)"
   exit 1
 fi
