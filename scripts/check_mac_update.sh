@@ -4,29 +4,31 @@
 #   scripts/check_mac_update.sh build OUT APP...   # arm64 Mac with Homebrew's GTK (as mac_bundle.sh)
 #   scripts/check_mac_update.sh check OUT APP...   # the same Mac, Homebrew moved away
 #
-# `build` makes four releases of each APP, versions 99.0.1 to 99.0.4 (above any real
+# `build` makes five releases of each APP, versions 99.0.1 to 99.0.5 (above any real
 # release, so a real latest.json never counts as newer): the app's Cargo.toml version set
 # for each build in this work tree only and put back after (nothing shipped is built so),
 # `cargo build --release -p APP --features suite-update/test-key`, then
 # scripts/mac_bundle.sh. It writes OUT/site/APP/vN/ with the tarball and a latest.json signed
 # by the update checks' test key (CRONKITE_RELEASE_TEST_KEY=1, never a release key), and
-# three bad releases: bad-file (a byte of the tarball changed after signing), bad-sig (the
-# manifest changed after signing), and v5 (99.0.4's tarball offered as 99.0.5, for a staged
-# file changed on disk). The site's port is in OUT/port.
+# three bad releases of 99.0.5's tarball offered as 99.0.6: bad-file (a byte of the tarball
+# changed after signing), bad-sig (the manifest changed after signing), and changed (good,
+# for a staged file changed on disk). The site's port is in OUT/port.
 #
 # `check` serves OUT/site on 127.0.0.1, installs 99.0.1 with the app's real install.sh, then
 # starts the installed app with CRONKITE_UPDATE_URL pointing at a newer release and proves:
-#   1. a staged update left by a killed process is applied at the next start: 99.0.2 is
-#      staged, the app is killed (-9), and the next start swaps the bundle before its window
-#      and runs the new executable in its place (same pid and arguments, its file open);
-#   2. a second running instance defers the swap: two instances run while 99.0.3 is staged;
-#      quitting the first (⌘Q) leaves 99.0.2 installed, quitting the second swaps 99.0.3 in;
-#   3. quitting then starting runs the new version: 99.0.4 staged, ⌘Q swaps it in, and the
-#      next start is 99.0.4 with the notice (the "update: Updated to <App> 99.0.4" line once
+#   1. a staged update left by a killed process is applied at the next start, which swaps
+#      the bundle before any window and runs the new executable in its own place (same
+#      pid): 99.0.2 staged, the app killed (-9), then started by Launch Services (`open -a`
+#      with a file, as Finder does: the file arrives by Apple Event after the re-exec);
+#      again with 99.0.3 started from the command line (the file kept in the arguments);
+#   2. a second running instance defers the swap: two instances run while 99.0.4 is staged;
+#      quitting the first (⌘Q) leaves 99.0.3 installed, quitting the second swaps 99.0.4 in;
+#   3. quitting then starting runs the new version: 99.0.5 staged, ⌘Q swaps it in, and the
+#      next start is 99.0.5 with the notice (the "update: Updated to <App> 99.0.5" line once
 #      the app shows it, else the `applied` record the notice reads);
 #   after each swap the bundle's ad-hoc signature verifies (`codesign --verify --deep
 #   --strict`), it carries no quarantine attribute, and nothing is left beside it;
-#   4. tampered releases are refused, 99.0.4 stays and still starts: a changed tarball, a
+#   4. tampered releases are refused, 99.0.5 stays and still starts: a changed tarball, a
 #      changed manifest, and a staged file changed on disk after its check (the apply step's
 #      own SHA-256 check).
 # Screenshots land in $OUT_CHECK/shots (default out/mac-update), logs in $OUT_CHECK/logs; a
@@ -39,7 +41,8 @@ shift 2
 apps=${*:-brick slate frame etch}
 mkdir -p "$work"
 work=$(cd "$work" && pwd)
-versions="1 2 3 4"
+versions="1 2 3 4 5"
+last=5
 version() { echo "99.0.$1"; }
 name_of() { echo "$(tr '[:lower:]' '[:upper:]' <<<"${1:0:1}")${1:1}"; }
 
@@ -75,10 +78,10 @@ build() {
         "$app" "http://127.0.0.1:$port/$app/v$n" "$v" "$site/$app-$v-x86_64-linux.tar.gz" "$tar" "$dmg" none "$site/latest.json"
     done
     cp "$work/$app-Cargo.toml.orig" "$toml"
-    # The bad releases, from 99.0.4's tarball offered as 99.0.5.
-    v=$(version 5)
-    tar=$work/build/v4/$app-$(version 4)-arm64-macos.tar.gz
-    for kind in bad-file bad-sig v5; do
+    # The bad releases, from the last one's tarball offered as the next version.
+    v=$(version $((last + 1)))
+    tar=$work/build/v$last/$app-$(version $last)-arm64-macos.tar.gz
+    for kind in bad-file bad-sig changed; do
       site=$work/site/$app/$kind
       mkdir -p "$site"
       cp "$tar" "$site/$app-$v-arm64-macos.tar.gz"
@@ -95,8 +98,8 @@ b = bytearray(open(p, "rb").read())
 b[len(b) // 2] ^= 0xFF
 open(p, "wb").write(b)
 EOF
-    sed -i '' "s/\"version\":\"$v\"/\"version\":\"99.0.6\"/" "$work/site/$app/bad-sig/latest.json"
-    grep -q '"version":"99.0.6"' "$work/site/$app/bad-sig/latest.json"
+    sed -i '' "s/\"version\":\"$v\"/\"version\":\"99.0.9\"/" "$work/site/$app/bad-sig/latest.json"
+    grep -q '"version":"99.0.9"' "$work/site/$app/bad-sig/latest.json"
     cp "$root/sites/$app/install.sh" "$work/site/$app-install.sh"
   done
   cp "$work/Cargo.lock.orig" "$root/Cargo.lock"
@@ -151,9 +154,25 @@ check_app() {
   up=$(tr '[:lower:]' '[:upper:]' <<<"$app")
 
   # Start the installed app on $file against release folder $1, logging to $2; sets $pid.
+  # With $3 `open`, through Launch Services as Finder does (`open -a`): the file arrives
+  # by Apple Event, not on the command line.
   launch() {
-    CRONKITE_UPDATE_URL=$url/$1 "$exe" "$file" >"$2" 2>&1 &
-    pid=$!
+    if [[ ${3:-} == open ]]; then
+      : >"$2"
+      open -a "$appdir" --stderr "$2" --env "CRONKITE_UPDATE_URL=$url/$1" "$file" 2>>"$2" ||
+        { fail "$app: open -a failed: $(tail -3 "$2" | tr '\n' '|')"; return 1; }
+      pid=""
+      local j
+      for j in $(seq 20); do
+        pid=$(pgrep -f "^$appdir/Contents/MacOS/" | head -1)
+        [[ -n $pid ]] && break
+        sleep 0.5
+      done
+      [[ -n $pid ]] || { fail "$app: open -a started nothing"; return 1; }
+    else
+      CRONKITE_UPDATE_URL=$url/$1 "$exe" "$file" >"$2" 2>&1 &
+      pid=$!
+    fi
     local i
     for i in $(seq 40); do
       [[ -n $(windows "$pid" | awk -F'\t' '$1 == 0') ]] && break
@@ -232,97 +251,112 @@ check_app() {
   else fail "$app: install: $(tr '\n' '|' <"$logs/$app-install.log")"; return; fi
   bundle_ok "$(version 1)" "installed"
 
-  # 1. A staged update left by a killed process: applied at the next start, then re-exec.
-  log=$logs/$app-1-killed.log
-  launch v2 "$log" || return
-  if staged "$(version 2)"; then pass "$app: $(version 2) staged while $(version 1) runs"
-  else fail "$app: $(version 2) wasn't staged: $(grep 'update' "$log" | tr '\n' '|')"; kill -9 "$pid"; return; fi
-  kill -9 "$pid"
-  wait "$pid" 2>/dev/null
-  [[ $(installed) == "$(version 1)" ]] && pass "$app: killed: still $(version 1) installed, $(version 2) staged" ||
-    fail "$app: killed, yet $(installed) installed"
-  log=$logs/$app-1-next-start.log
-  launch v2 "$log" || return
-  shot "$app-1-started-after-kill"
-  if grep -q "update: .* $(version 2) swapped in" "$log" &&
-    grep -q "update: .* $(version 2) started in place of $(version 1)" "$log" &&
-    (($(grep -c "$name starting" "$log") == 2)); then
-    pass "$app: the next start swapped $(version 2) in, then ran it in its own place (pid $pid): $(grep 'update:' "$log" | sed 's/.*update: /update: /' | tr '\n' '|')"
-  else fail "$app: next start: $(grep -E 'update:|starting' "$log" | tr '\n' '|')"; fi
-  windows "$pid" | awk -F'\t' '$1 == 0' >"$logs/$app-1-windows.txt"
-  grep -qF "$(basename "$file")" "$logs/$app-1-windows.txt" &&
-    pass "$app: the relaunched $(version 2) opened $(basename "$file") from the same arguments: $(tr '\n' '|' <"$logs/$app-1-windows.txt")" ||
-    fail "$app: the relaunched app's windows: $(tr '\n' '|' <"$logs/$app-1-windows.txt")"
-  notice_ok "$(version 2)" "$log"
-  bundle_ok "$(version 2)" "after the start's swap"
-  quit "$pid"
+  # 1. A staged update left by a killed process: applied at the next start, then re-exec;
+  # version $1 (the installed one is $1 - 1), started the next time by $2 (open or exe).
+  killed() {
+    local n=$1 how=$2 v old tag
+    v=$(version "$n") old=$(version $((n - 1))) tag=$app-1-$how
+    log=$logs/$tag-killed.log
+    launch "v$n" "$log" || return 1
+    if staged "$v"; then pass "$app: $v staged while $old runs"
+    else fail "$app: $v wasn't staged: $(grep 'update' "$log" | tr '\n' '|')"; kill -9 "$pid"; return 1; fi
+    kill -9 "$pid"
+    wait "$pid" 2>/dev/null
+    [[ $(installed) == "$old" ]] && pass "$app: killed: still $old installed, $v staged" ||
+      fail "$app: killed, yet $(installed) installed"
+    log=$logs/$tag-next-start.log
+    if [[ $how == open ]]; then launch "v$n" "$log" open || return 1; else launch "v$n" "$log" || return 1; fi
+    shot "$tag-started-after-kill"
+    if grep -q "update: .* $v swapped in" "$log" &&
+      grep -q "update: .* $v started in place of $old" "$log" &&
+      (($(grep -c "$name starting" "$log") == 2)); then
+      pass "$app: the next start ($how) swapped $v in, then ran it in its own place (pid $pid): $(grep 'update:' "$log" | sed 's/.*update: /update: /' | tr '\n' '|')"
+    else fail "$app: next start ($how): $(grep -E 'update:|starting' "$log" | tr '\n' '|')"; fi
+    windows "$pid" | awk -F'\t' '$1 == 0' >"$logs/$tag-windows.txt"
+    local from="its arguments"
+    [[ $how == open ]] && from="Launch Services' Apple Event"
+    grep -qF "$(basename "$file")" "$logs/$tag-windows.txt" &&
+      pass "$app: the relaunched $v opened $(basename "$file") from $from: $(tr '\n' '|' <"$logs/$tag-windows.txt")" ||
+      fail "$app: the relaunched $v's windows ($how): $(tr '\n' '|' <"$logs/$tag-windows.txt")"
+    notice_ok "$v" "$log"
+    bundle_ok "$v" "after the start's swap ($how)"
+    quit "$pid"
+  }
+  killed 2 open || return
+  killed 3 exe || return
 
   # 2. A second instance defers the swap until both have quit.
+  local v4 v3
+  v4=$(version 4) v3=$(version 3)
   log=$logs/$app-2-first.log
-  launch v3 "$log" || return
+  launch v4 "$log" || return
   a=$pid
-  launch v3 "$logs/$app-2-second.log" || { quit "$a"; return; }
+  launch v4 "$logs/$app-2-second.log" || { quit "$a"; return; }
   b=$pid
-  if staged "$(version 3)"; then pass "$app: $(version 3) staged while two instances run (pids $a, $b)"
-  else fail "$app: $(version 3) wasn't staged"; fi
+  if staged "$v4"; then pass "$app: $v4 staged while two instances run (pids $a, $b)"
+  else fail "$app: $v4 wasn't staged"; fi
   shot "$app-2-two-instances"
   quit "$a"
   sleep 1
-  [[ $(installed) == "$(version 2)" ]] && grep -qx "version=$(version 3)" "$updates/staged" &&
-    pass "$app: the first quit with the second running: still $(version 2), $(version 3) waits" ||
+  [[ $(installed) == "$v3" ]] && grep -qx "version=$v4" "$updates/staged" &&
+    pass "$app: the first quit with the second running: still $v3, $v4 waits" ||
     fail "$app: after the first quit: $(installed) installed; $(grep 'update:' "$log" | tr '\n' '|')"
   quit "$b"
-  grep -q "update: .* $(version 3) swapped in" "$logs/$app-2-second.log" &&
-    pass "$app: the last instance's quit swapped $(version 3) in: $(grep 'swapped in' "$logs/$app-2-second.log" | sed 's/.*update: /update: /')" ||
+  grep -q "update: .* $v4 swapped in" "$logs/$app-2-second.log" &&
+    pass "$app: the last instance's quit swapped $v4 in: $(grep 'swapped in' "$logs/$app-2-second.log" | sed 's/.*update: /update: /')" ||
     fail "$app: the last quit: $(grep 'update:' "$logs/$app-2-second.log" | tr '\n' '|')"
-  bundle_ok "$(version 3)" "after both quit"
+  bundle_ok "$v4" "after both quit"
   log=$logs/$app-2-next-start.log
-  launch v3 "$log" && {
-    notice_ok "$(version 3)" "$log"
+  launch v4 "$log" && {
+    notice_ok "$v4" "$log"
     quit "$pid"
   }
 
   # 3. Quit, then start: the new version, with the notice.
+  local v5
+  v5=$(version $last)
   log=$logs/$app-3-quit.log
-  launch v4 "$log" || return
-  staged "$(version 4)" && pass "$app: $(version 4) staged" || fail "$app: $(version 4) wasn't staged"
+  launch "v$last" "$log" || return
+  staged "$v5" && pass "$app: $v5 staged" || fail "$app: $v5 wasn't staged"
   quit "$pid"
-  grep -q "update: .* $(version 4) swapped in" "$log" &&
-    pass "$app: ⌘Q swapped $(version 4) in" || fail "$app: ⌘Q: $(grep 'update:' "$log" | tr '\n' '|')"
-  bundle_ok "$(version 4)" "after quitting"
+  grep -q "update: .* $v5 swapped in" "$log" &&
+    pass "$app: ⌘Q swapped $v5 in" || fail "$app: ⌘Q: $(grep 'update:' "$log" | tr '\n' '|')"
+  bundle_ok "$v5" "after quitting"
   log=$logs/$app-3-next-start.log
-  launch v4 "$log" || return
+  launch "v$last" "$log" || return
   shot "$app-3-updated"
-  notice_ok "$(version 4)" "$log"
-  ! grep -q "swapped in\|started in place" "$log" && pass "$app: the next start is $(version 4) without swapping anything" ||
+  notice_ok "$v5" "$log"
+  ! grep -q "swapped in\|started in place" "$log" && pass "$app: the next start is $v5 without swapping anything" ||
     fail "$app: the next start swapped again: $(grep 'update:' "$log" | tr '\n' '|')"
   quit "$pid"
 
   # 4. Tampered releases: refused, the installed app stays and starts.
+  local bad
+  bad=$(version $((last + 1)))
   for kind in bad-file bad-sig; do
     log=$logs/$app-4-$kind.log
     launch "$kind" "$log" || return
     for n in $(seq 40); do grep -q "WARN.*update:" "$log" && break; sleep 0.5; done
     quit "$pid"
-    if grep -qE "WARN.*update: .*(sha256|signature)" "$log" && ! grep -qx "version=$(version 5)" "$updates/staged" 2>/dev/null; then
+    if grep -qE "WARN.*update: .*(sha256|signature)" "$log" && ! grep -qx "version=$bad" "$updates/staged" 2>/dev/null; then
       pass "$app: $kind refused: $(grep 'WARN.*update:' "$log" | sed 's/.*update: /update: /' | head -1)"
     else fail "$app: $kind: $(grep 'update:' "$log" | tr '\n' '|'); staged: $(cat "$updates/staged" 2>&1 | tr '\n' ' ')"; fi
-    bundle_ok "$(version 4)" "after $kind"
+    bundle_ok "$v5" "after $kind"
   done
   log=$logs/$app-4-staged-changed.log
-  launch v5 "$log" || return
-  if staged "$(version 5)"; then
+  launch changed "$log" || return
+  if staged "$bad"; then
     f=$updates/$(sed -n 's/^file=//p' "$updates/staged")
     python3 -c 'import sys; p = sys.argv[1]; b = bytearray(open(p, "rb").read()); b[len(b) // 2] ^= 0xFF; open(p, "wb").write(b)' "$f"
-    pass "$app: $(version 5) staged, then a byte of $(basename "$f") changed"
-  else fail "$app: $(version 5) wasn't staged"; fi
+    pass "$app: $bad staged, then a byte of $(basename "$f") changed"
+  else fail "$app: $bad wasn't staged"; fi
   quit "$pid"
   grep -q "WARN.*update: not applied: the staged .* has sha256" "$log" && [[ ! -f $f ]] &&
     pass "$app: the changed staged file refused and removed at exit: $(grep 'not applied' "$log" | sed 's/.*update: /update: /')" ||
     fail "$app: changed staged file: $(grep 'update:' "$log" | tr '\n' '|')"
-  bundle_ok "$(version 4)" "after the changed staged file"
+  bundle_ok "$v5" "after the changed staged file"
   log=$logs/$app-4-still-starts.log
-  launch v4 "$log" && {
+  launch "v$last" "$log" && {
     shot "$app-4-still-starts"
     pass "$app: $(installed) still starts after the tampered releases"
     quit "$pid"
