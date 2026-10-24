@@ -114,6 +114,8 @@ fn main() -> glib::ExitCode {
     eprintln!("{}", suite_ui::startup_message(APP));
     // This run's part in applying updates (ADR 0012); before the bundle's environment.
     let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
+    // "Updated to Etch X.Y.Z" in the first window, at the first start after an update.
+    suite_ui::notice::queue(suite_update::notice(APP, env!("CARGO_PKG_VERSION")));
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
         Ok(Some(res)) => tracing::info!("running from the bundle {}", res.display()),

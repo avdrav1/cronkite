@@ -99,6 +99,8 @@ fn main() -> glib::ExitCode {
     eprintln!("{}", suite_ui::startup_message(APP));
     // This run's part in applying updates (ADR 0012); before the bundle's environment.
     let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
+    // "Updated to Frame X.Y.Z" in the first window, at the first start after an update.
+    suite_ui::notice::queue(suite_update::notice(APP, env!("CARGO_PKG_VERSION")));
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
         Ok(Some(res)) => tracing::info!("running from the bundle {}", res.display()),
@@ -144,7 +146,11 @@ fn main() -> glib::ExitCode {
             })
             .build();
         app.add_action_entries([new, open, close, quit]);
-        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"));
+        let update = suite_ui::chrome::AutoUpdate {
+            on: suite_update::automatic(APP),
+            keep: |on| suite_update::set_automatic(APP, on),
+        };
+        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"), update);
         if suite_ui::chrome::MENU_BAR {
             app.set_menubar(Some(&menus::bar()));
         }

@@ -2,6 +2,7 @@
 """Release signing keys: Ed25519, through the openssl command (OpenSSL 3), ADR 0012.
 
     release_key.py new KEY_DIR NAME
+    release_key.py trusts PROGRAM...
 
 `new` makes a key pair: the private key KEY_DIR/NAME.key (mode 0600 in a 0700 folder,
 which must be outside the repository) and its public key packaging/release-keys/NAME.pub,
@@ -12,6 +13,11 @@ signing then reads from the same variable.
 The release keys are two: one signs releases (ship.sh's CRONKITE_RELEASE_KEY), the other
 is kept offline elsewhere, so a lost or leaked key can be replaced without stranding
 installed apps.
+
+`trusts` checks that each PROGRAM (an app's release binary, or a .tar.gz holding one)
+carries every release key in packaging/release-keys and not the update checks' test key
+(crates/suite-update/test-key/test.pub, which only `test-key` builds compile in); ship.sh
+verify and win_bundle.sh run it, ADR 0012 item 8.
 """
 import base64
 import os
@@ -106,6 +112,47 @@ def verifies(data, signature, keys=KEYS):
     return None
 
 
+TEST_PUB = ROOT / "crates" / "suite-update" / "test-key" / "test.pub"
+
+
+def _pem_body(pub):
+    """A PEM file's base64 body, as the apps compile it in (include_str!)."""
+    return "".join(l for l in Path(pub).read_text().splitlines() if not l.startswith("-----")).encode()
+
+
+def _programs(path):
+    """(name, bytes) of `path`, or, for a release .tar.gz, of the app's program in it: the
+    Linux tarball's `<name>/<app>`, the macOS one's `<App>.app/Contents/MacOS/<app>`."""
+    if str(path).endswith(".tar.gz"):
+        import tarfile
+        with tarfile.open(path) as tar:
+            for m in tar.getmembers():
+                parts = m.name.strip("/").split("/")
+                program = len(parts) == 2 or parts[-2:-1] == ["MacOS"]
+                if m.isfile() and m.mode & 0o111 and program:
+                    yield f"{path}:{m.name}", tar.extractfile(m).read()
+    else:
+        yield str(path), Path(path).read_bytes()
+
+
+def trusts(path, keys=KEYS, test_pub=TEST_PUB):
+    """Problems with the keys the program(s) in `path` trust; none if each carries every
+    release key in `keys` and not `test_pub`."""
+    problems, found = [], False
+    release = {p.stem: _pem_body(p) for p in sorted(Path(keys).glob("*.pub"))}
+    test = _pem_body(test_pub)
+    for name, data in _programs(path):
+        found = True
+        missing = [k for k, body in release.items() if body not in data]
+        if missing:
+            problems.append(f"{name} lacks the release key{'s' if len(missing) > 1 else ''} {', '.join(missing)}")
+        if test in data:
+            problems.append(f"{name} trusts the test key (built with suite-update's test-key feature)")
+    if not found:
+        problems.append(f"{path} holds no program")
+    return problems
+
+
 def main(argv):
     if len(argv) == 4 and argv[1] == "new":
         try:
@@ -116,6 +163,17 @@ def main(argv):
         print(f"private key {key}{' (encrypted)' if os.environ.get(PASS) else ''}")
         print(f"public key  {pub}")
         return 0
+    if len(argv) >= 3 and argv[1] == "trusts":
+        bad = 0
+        for path in argv[2:]:
+            problems = trusts(path)
+            for p in problems:
+                print(f"FAIL {p}")
+            if problems:
+                bad += 1
+            else:
+                print(f"ok   {path}: trusts {', '.join(p.stem for p in sorted(KEYS.glob('*.pub')))}, not the test key")
+        return 1 if bad else 0
     print(__doc__.strip().split("\n\n")[1], file=sys.stderr)
     return 2
 

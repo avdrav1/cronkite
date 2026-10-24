@@ -1,7 +1,9 @@
 # WIN-3 acceptance on Windows: each app is a GUI-subsystem program whose --version still
 # prints from a terminal, its windows have Windows' own title bar (minimize, maximize,
-# close, snap), its menus are in a menu bar row under it (Help with About, File with
-# Exit), and it follows Windows' light and dark app mode, live.
+# close, snap), its menus are in a menu bar row under it (Help with Update Automatically and
+# About, File with Exit), and it follows Windows' light and dark app mode, live. UPD-3: Help's
+# Update Automatically is kept in the settings folder, and the first start after an update
+# says so once.
 #
 #   powershell -File scripts\check_win_ui.ps1 [-Bin target\debug] [-Out out\win-ui]
 #
@@ -15,8 +17,14 @@
 #   - its window (on a sample file) has WS_CAPTION, WS_SYSMENU, WS_MINIMIZEBOX,
 #     WS_MAXIMIZEBOX, and WS_THICKFRAME, a system title bar above its client area, and
 #     snaps to the left half with Win+Left;
-#   - F10 then Down opens File (a popup window more), Left moves to Help, Down and Enter
-#     open About (a window more), and File's last item (Up from the top) exits the app;
+#   - F10 then Down opens File (a popup window more), Left moves to Help, whose first item,
+#     Update Automatically, Enter turns off (the settings folder's `update` says
+#     automatic=false); Help again, Down and Enter open About (a window more), and File's
+#     last item (Up from the top) exits the app;
+#   - UPD-3: with an `applied` record naming this version in its updates folder, the first
+#     start logs "update: Updated to <App> X.Y.Z" (the window screenshot shows the notice)
+#     and removes the record; the next start (dark) doesn't, and Help's Update
+#     Automatically, unchecked there (screenshot), turns it back on;
 #   - with AppsUseLightTheme switched to 0 while it runs, its title bar and menu bar row
 #     turn dark within a few seconds, and light again with 1; started in dark mode, it's
 #     dark from the start.
@@ -278,9 +286,21 @@ foreach ($app in $samples.Keys) {
     $text = if (Test-Path $console) { Get-Content -Raw $console } else { "" }
     Check ($text -match [regex]::Escape($want)) "${app}: --version in a console window shows '$want' ($logs\$app-version-console.txt)"
 
+    # UPD-3: no setting yet, and the record an applied update leaves.
+    $title = (Get-Culture).TextInfo.ToTitleCase($app)
+    $settings = "$env:APPDATA\Cronkite\$title\update"
+    $updates = "$env:LOCALAPPDATA\Cronkite\$title\updates"
+    Remove-Item -Force -ErrorAction SilentlyContinue $settings
+    New-Item -ItemType Directory -Force $updates | Out-Null
+    Set-Content -Encoding ascii "$updates\applied" "version=$(Version $app)"
+
     # The window, light.
     $p = Start-App $app $samples[$app] "$app-light"
     if (-not $p) { continue }
+    $notice = "update: Updated to $title $(Version $app)"
+    $log = Get-Content -ErrorAction SilentlyContinue "$logs\$app-light.err.txt"
+    Check ($log -contains $notice) "${app}: the first start after an update logs '$notice' ($shots\$app-1-window-light.png)"
+    Check (-not (Test-Path "$updates\applied")) "${app}: the applied record is gone"
     $h = $p.MainWindowHandle
     $consoles = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($p.Id)" | Where-Object { $_.Name -in "conhost.exe", "OpenConsole.exe", "WindowsTerminal.exe" })
     Check ($consoles.Count -eq 0) "${app}: no console process with it ($($consoles.Name -join ','))"
@@ -315,9 +335,15 @@ foreach ($app in $samples.Keys) {
     DesktopShot "$app-2-file-menu"
     Press Left
     DesktopShot "$app-3-help-menu"
-    # Help's one item, About, has the focus.
+    # Help's first item, Update Automatically, has the focus: Enter turns it off.
     Press Return
-    $title = (Get-Culture).TextInfo.ToTitleCase($app)
+    Start-Sleep -Milliseconds 500
+    $kept = if (Test-Path $settings) { (Get-Content -Raw $settings).Trim() } else { "" }
+    Check ($kept -eq "automatic=false") "${app}: Help -> Update Automatically keeps automatic=false in $settings ('$kept')"
+    # Help again; About is next.
+    [void][Win]::Front($h)
+    Press F10; Press Down; Press Left; Press Down
+    Press Return
     $about = $null
     for ($i = 0; $i -lt 20 -and -not $about; $i++) {
         Start-Sleep -Milliseconds 250
@@ -376,6 +402,17 @@ foreach ($app in $samples.Keys) {
         WindowShot $p.MainWindowHandle "$app-10-window-dark-at-start"
         $looks = Looks $p.MainWindowHandle
         Check ($looks.title -lt 100 -and $looks.menu -lt 100) "${app}: dark at start: title bar $($looks.title), menu bar row $($looks.menu)"
+        # UPD-3: the next start shows no notice; Update Automatically is still off (the
+        # screenshot shows it unchecked), and Enter turns it back on.
+        $log = Get-Content -ErrorAction SilentlyContinue "$logs\$app-dark.err.txt"
+        Check (-not ($log -match "^update: Updated to")) "${app}: the next start shows no notice"
+        [void][Win]::Front($p.MainWindowHandle)
+        Press F10; Press Down; Press Left
+        DesktopShot "$app-11-help-menu-restarted"
+        Press Return
+        Start-Sleep -Milliseconds 500
+        $kept = if (Test-Path $settings) { (Get-Content -Raw $settings).Trim() } else { "" }
+        Check ($kept -eq "automatic=true") "${app}: after a restart, Help -> Update Automatically turns it back on ('$kept')"
         Stop-App $p
     }
     SetDark $false

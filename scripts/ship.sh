@@ -190,6 +190,8 @@ build)
     if [ "$(uname -s)" = Darwin ]; then
       # On an arm64 Mac with Homebrew's GTK (release-macos.yml runs this on macos-14).
       cargo build --release --locked -p $APP
+      # The release binary trusts the release keys and not the update checks' (ADR 0012).
+      python3 scripts/release_key.py trusts target/release/$APP
       scripts/mac_bundle.sh $APP target/release dist
       if [ -n "${DOWNLOAD_BASE_URL:-}" ]; then latest; fi
       exit 0
@@ -201,6 +203,7 @@ build)
       # In MSYS2's UCRT64 shell with its GTK and Inno Setup 6 (release-windows.yml runs this
       # on windows-latest).
       cargo build --release --locked -p $APP
+      python3 scripts/release_key.py trusts target/release/$APP.exe
       scripts/win_bundle.sh $APP target/release dist
       if [ -n "${DOWNLOAD_BASE_URL:-}" ]; then latest; fi
       exit 0
@@ -241,6 +244,9 @@ verify)
   [ -x "dist/$NAME/$APP" ] || { echo "run build first"; exit 1; }
   scripts/check_release.sh "dist/$NAME/$APP"
   "$INSTALL_CHECK" "$TAR"
+  # Each platform's program trusts the release keys and not the update checks' test key
+  # (ADR 0012); the Windows one was checked before Setup.exe packed it (build --windows).
+  python3 scripts/release_key.py trusts "dist/$NAME/$APP" $([ -f "$MAC_TAR" ] && echo "$MAC_TAR")
   # The macOS and Windows builds were checked on their runners (release-*.yml's verify
   # jobs); here, that latest.json names this version's files in dist/ as they are.
   python3 scripts/release_json.py check "$OUT/latest.json" dist

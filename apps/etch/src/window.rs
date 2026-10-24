@@ -53,8 +53,8 @@ enum Bench {
 }
 
 /// The app's actions, shortcuts, menu bar (every window shows it on Linux and Windows,
-/// Windows' with Help; on macOS it's the system's, after GTK's app menu with About and
-/// Quit), and style.
+/// ending with Help: Update Automatically and About Etch; on macOS it's the system's,
+/// after GTK's app menu with About, Update Automatically, and Quit), and style.
 pub fn install_app_actions(app: &gtk::Application) {
     colours::install_style();
     let new = gio::ActionEntry::builder("new")
@@ -81,7 +81,11 @@ pub fn install_app_actions(app: &gtk::Application) {
         })
         .build();
     app.add_action_entries([new, open, open_recent, quit]);
-    suite_ui::chrome::install(app, crate::APP, env!("CARGO_PKG_VERSION"));
+    let update = suite_ui::chrome::AutoUpdate {
+        on: suite_update::automatic(crate::APP),
+        keep: |on| suite_update::set_automatic(crate::APP, on),
+    };
+    suite_ui::chrome::install(app, crate::APP, env!("CARGO_PKG_VERSION"), update);
     for (action, accels) in keys::accels(Primary::HERE) {
         let accels: Vec<&str> = accels.iter().map(String::as_str).collect();
         app.set_accels_for_action(action, &accels);
@@ -148,6 +152,10 @@ pub fn install_app_actions(app: &gtk::Application) {
             (&labels[3], &image_menu::menu()),
         ],
     );
+    // Linux's menu bar ends with Help too (Windows' has it from `menu_bar`).
+    if !suite_ui::chrome::MENU_BAR {
+        menu.append_item(&suite_ui::chrome::help_menu(crate::APP));
+    }
     app.set_menubar(Some(&menu));
 }
 
@@ -314,7 +322,7 @@ fn open_with(
     spinner.start();
     opening.append(&spinner);
     opening.append(&gtk::Label::new(Some("Opening…")));
-    window.set_child(Some(&opening));
+    window.set_child(Some(&suite_ui::notice::host(&opening)));
     OPEN.with_borrow_mut(|open| open.push((canonical(path), window.downgrade())));
     window.present();
 
@@ -1035,7 +1043,7 @@ fn show(
     content.append(&middle);
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     content.append(&bar);
-    window.set_child(Some(&content));
+    window.set_child(Some(&suite_ui::notice::host(&content)));
 
     let action = |name: &str, f: fn(&Canvas)| {
         let canvas = canvas.clone();

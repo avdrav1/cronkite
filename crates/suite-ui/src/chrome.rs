@@ -1,17 +1,20 @@
 //! Window chrome and menus (MAC-4, WIN-3): GNOME's on Linux, the Mac's on macOS, Windows'
 //! on Windows.
 //!
-//! On Linux a window has a header bar with its buttons; Slate's menus are behind a menu
-//! button in it, and Etch shows its menu bar in the window. On macOS the app's menus are
-//! in the menu bar ([`menu_bar`]), after the app menu GTK makes there (About, Settings,
-//! Services, Hide ⌘H, Hide Others ⌥⌘H, Show All, Quit ⌘Q, whose About and Quit run
-//! `app.about` and `app.quit`) and before a Window menu (Minimize ⌘M, Zoom, then the
-//! windows, which AppKit lists). On Windows each window shows the same menus in a menu bar
-//! row under its title bar (GTK's `GtkApplicationWindow` puts the app's menu bar there),
-//! followed by Help with About, and File ends with Exit ([`exit_section`]). Windows keep
-//! the system's own title bar on both ([`init`] asks GTK for it on Windows), and the
-//! buttons a header bar would hold go in a toolbar row at the top of the window
-//! ([`Toolbar`]).
+//! On Linux a window has a header bar with its buttons, and at its end the main menu
+//! ([`main_menu`]) with "Update Automatically" and About ([`app_section`]); Slate's menus
+//! are in that menu too, and Etch shows its menu bar in the window, with Help holding
+//! the same two items ([`help_menu`]). On macOS the app's menus are in the menu bar
+//! ([`menu_bar`]), after the app menu GTK makes there (About, Update Automatically,
+//! Settings, Services, Hide ⌘H, Hide Others ⌥⌘H, Show All, Quit ⌘Q, whose About, Update
+//! Automatically, and Quit run `app.about`, `app.update-automatically`, and `app.quit`;
+//! `macos_app_menu`) and before a Window menu (Minimize ⌘M, Zoom, then the windows,
+//! which AppKit lists). On Windows each window shows the same menus in a menu bar row
+//! under its title bar (GTK's `GtkApplicationWindow` puts the app's menu bar there),
+//! followed by Help with Update Automatically and About, and File ends with Exit
+//! ([`exit_section`]). Windows keep the system's own title bar on both ([`init`] asks GTK
+//! for it on Windows), and the buttons a header bar would hold go in a toolbar row at the
+//! top of the window ([`Toolbar`]).
 //!
 //! Each app builds its menus once, as `gio::Menu`s, and shows the same ones everywhere.
 
@@ -44,11 +47,24 @@ fn csd(windows: bool, set: bool) -> Option<&'static str> {
 /// backend hands it to `NSApp.windowsMenu`, where AppKit lists the windows).
 const MACOS_SPECIAL: &str = "gtk-macos-special";
 
+/// "Update Automatically" (ADR 0012): whether it's on as the app starts, and what keeps a
+/// change across runs (the app's `suite_update::automatic` and `suite_update::set_automatic`;
+/// this crate doesn't depend on `suite-update`).
+#[derive(Clone, Copy, Debug)]
+pub struct AutoUpdate {
+    pub on: bool,
+    pub keep: fn(bool) -> std::io::Result<()>,
+}
+
+/// The label of the check item that turns updating on and off.
+pub const UPDATE_AUTOMATICALLY: &str = "Update Automatically";
+
 /// Install the app actions every app has, at startup: `app.about` (the About dialog, the
-/// app menu's first item on macOS, Help's on Windows) and the Window menu's `app.minimize`
-/// (⌘M on macOS) and `app.zoom`, which act on the active window. On Windows also the
-/// windows' conventions there (`windows_conventions`).
-pub fn install(app: &gtk::Application, kind: AppKind, version: &'static str) {
+/// app menu's first item on macOS, Help's on Windows), `app.update-automatically` (the
+/// check item beside it, `update`'s state, each change kept), and the Window menu's
+/// `app.minimize` (⌘M on macOS) and `app.zoom`, which act on the active window. On Windows
+/// also the windows' conventions there (`windows_conventions`).
+pub fn install(app: &gtk::Application, kind: AppKind, version: &'static str, update: AutoUpdate) {
     let about_entry = gio::ActionEntry::builder("about")
         .activate(move |app: &gtk::Application, _, _| {
             about(app.active_window().as_ref(), kind, version);
@@ -73,11 +89,61 @@ pub fn install(app: &gtk::Application, kind: AppKind, version: &'static str) {
         })
         .build();
     app.add_action_entries([about_entry, minimize, zoom]);
+    app.add_action(&update_action(update));
     if cfg!(target_os = "macos") {
         app.set_accels_for_action("app.minimize", &["<Meta>m"]);
     }
     if cfg!(windows) {
         windows_conventions(app, kind);
+    }
+}
+
+/// `update-automatically`: a boolean state starting at `update.on`; activating it toggles
+/// it (GIO's default for a boolean action without a parameter), and a change takes only
+/// once `update.keep` has written it.
+fn update_action(update: AutoUpdate) -> gio::SimpleAction {
+    let action =
+        gio::SimpleAction::new_stateful("update-automatically", None, &update.on.to_variant());
+    action.connect_change_state(move |action, value| {
+        let Some(on) = value.and_then(|v| v.get::<bool>()) else {
+            return;
+        };
+        match (update.keep)(on) {
+            Ok(()) => action.set_state(&on.to_variant()),
+            Err(e) => tracing::warn!("update: cannot keep {UPDATE_AUTOMATICALLY}: {e}"),
+        }
+    });
+    action
+}
+
+/// macOS: the app menu GTK makes gets "Update Automatically" after "About `<App>`", a check
+/// item for `app.update-automatically`. GTK 4 builds that menu from its own resource
+/// (`/org/gtk/libgtk/ui/gtkapplication-quartz.ui`) and has no API to add to it, so this
+/// registers a copy with the item (`data/gtkapplication-quartz.ui`, compiled by
+/// `build.rs`) over GTK's: GLib looks a path up in the resource registered last first.
+/// GTK's own are registered in `gtk_init`, or, compiled in as static resources, at the
+/// first lookup, each then going ahead of those registered before; GTK reads the menu at
+/// the application's startup. So this initialises GTK and looks the menu up before
+/// registering the copy; call it after the environment GTK reads is set, before the
+/// application runs ([`crate::launch::run`] does). GTK keeps the item in its menu as it
+/// rebuilds the menu bar, its check mark following the action's state.
+#[cfg(target_os = "macos")]
+pub(crate) fn macos_app_menu() {
+    const PATH: &str = "/org/gtk/libgtk/ui/gtkapplication-quartz.ui";
+    static MENU: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app-menu.gresource"));
+    if let Err(e) = gtk::init() {
+        tracing::warn!("app menu: {e}");
+        return;
+    }
+    let lookup = || gio::resources_lookup_data(PATH, gio::ResourceLookupFlags::NONE);
+    let _ = lookup();
+    match gio::Resource::from_data(&glib::Bytes::from_static(MENU)) {
+        Ok(resource) => gio::resources_register(&resource),
+        Err(e) => tracing::warn!("app menu: {e}"),
+    }
+    let ours = lookup().is_ok_and(|menu| menu.windows(20).any(|w| w == b"update-automatically"));
+    if !ours {
+        tracing::warn!("app menu: GTK's own is still the one found, without Update Automatically");
     }
 }
 
@@ -105,7 +171,7 @@ fn windows_conventions(app: &gtk::Application, kind: AppKind) {
 }
 
 /// The menu bar of `menus`, each a submenu with its label; after them the Window menu on
-/// macOS and the Help menu (About) on Windows.
+/// macOS and the Help menu ([`help_menu`]) on Windows.
 pub fn menu_bar(kind: AppKind, menus: &[(&str, &gio::Menu)]) -> gio::Menu {
     let bar = gio::Menu::new();
     for (label, menu) in menus {
@@ -129,14 +195,36 @@ fn window_menu() -> gio::MenuItem {
     item
 }
 
-/// Windows' Help menu: About the app.
-fn help_menu(kind: AppKind) -> gio::MenuItem {
+/// The app's own items: "Update Automatically" (a check item, `app.update-automatically`'s
+/// state) and "About `<App>`". The main menu's last section on Linux, Help on Windows (and
+/// Etch's on Linux); on macOS GTK's app menu has them (`macos_app_menu`).
+pub fn app_section(kind: AppKind) -> gio::Menu {
     let menu = gio::Menu::new();
+    menu.append(Some(UPDATE_AUTOMATICALLY), Some("app.update-automatically"));
     menu.append(
         Some(&format!("About {}", kind.display_name())),
         Some("app.about"),
     );
-    gio::MenuItem::new_submenu(Some("Help"), &menu)
+    menu
+}
+
+/// The Help menu: [`app_section`]. Windows' menu bar ends with it, and so does Etch's on
+/// Linux, whose windows show their menu bar.
+pub fn help_menu(kind: AppKind) -> gio::MenuItem {
+    gio::MenuItem::new_submenu(Some("Help"), &app_section(kind))
+}
+
+/// A Linux header bar's main menu: the button at its end (`open-menu-symbolic`, named
+/// "Main Menu"; F10 opens it) showing `menu`, which ends with [`app_section`].
+pub fn main_menu(menu: &impl IsA<gio::MenuModel>) -> gtk::MenuButton {
+    let button = gtk::MenuButton::builder()
+        .icon_name("open-menu-symbolic")
+        .menu_model(menu)
+        .tooltip_text("Main Menu")
+        .primary(true)
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label("Main Menu")]);
+    button
 }
 
 /// The section File ends with on Windows: Exit, which runs `app.quit` (each app's closes
@@ -338,11 +426,80 @@ mod tests {
             assert_eq!(bar.n_items(), 3);
             assert_eq!(label(2).as_deref(), Some("Help"));
             assert_eq!(special, None);
-            want.extend([item("Help", None), item("About Brick", Some("app.about"))]);
+            want.extend([
+                item("Help", None),
+                item("Update Automatically", Some("app.update-automatically")),
+                item("About Brick", Some("app.about")),
+            ]);
         } else {
             assert_eq!(bar.n_items(), 2, "Linux has no Window or Help menu");
         }
         assert_eq!(items(&bar), want);
+    }
+
+    #[test]
+    fn update_automatically_sits_before_about() {
+        let item = |l: &str, a: &str| (l.to_owned(), Some(a.to_owned()), None);
+        assert_eq!(
+            items(&app_section(AppKind::Etch)),
+            [
+                item("Update Automatically", "app.update-automatically"),
+                item("About Etch", "app.about"),
+            ]
+        );
+        let help = gio::Menu::new();
+        help.append_item(&help_menu(AppKind::Slate));
+        assert_eq!(items(&help)[0], ("Help".to_owned(), None, None));
+        assert_eq!(items(&help)[2], item("About Slate", "app.about"));
+    }
+
+    /// The settings file the test's `keep` writes, as `suite_update::set_automatic` does.
+    fn settings() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("suite-ui-update-{}", std::process::id()))
+    }
+
+    fn read_setting() -> bool {
+        std::fs::read_to_string(settings()).map_or(true, |s| s.trim() != "automatic=false")
+    }
+
+    fn keep_setting(on: bool) -> std::io::Result<()> {
+        std::fs::write(settings(), format!("automatic={on}\n"))
+    }
+
+    fn refuse(_: bool) -> std::io::Result<()> {
+        Err(std::io::Error::other("read-only"))
+    }
+
+    #[test]
+    fn update_automatically_toggles_keeps_each_change_and_starts_from_what_was_kept() {
+        let _ = std::fs::remove_file(settings());
+        let state = |a: &gio::SimpleAction| a.state().and_then(|s| s.get::<bool>());
+        let update = || AutoUpdate {
+            on: read_setting(),
+            keep: keep_setting,
+        };
+        let action = update_action(update());
+        assert_eq!(state(&action), Some(true), "on by default");
+        action.activate(None);
+        assert_eq!(state(&action), Some(false));
+        assert_eq!(
+            std::fs::read_to_string(settings()).unwrap(),
+            "automatic=false\n"
+        );
+        // The next run's action starts off.
+        let next = update_action(update());
+        assert_eq!(state(&next), Some(false));
+        next.activate(None);
+        assert_eq!(state(&next), Some(true));
+        assert!(read_setting());
+        let _ = std::fs::remove_file(settings());
+        // A change that can't be kept doesn't take.
+        let stuck = update_action(AutoUpdate {
+            on: true,
+            keep: refuse,
+        });
+        stuck.activate(None);
+        assert_eq!(state(&stuck), Some(true));
     }
 
     #[test]

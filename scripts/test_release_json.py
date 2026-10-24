@@ -221,5 +221,56 @@ class Signature(unittest.TestCase):
         self.assertIsNone(release_key.verifies(data, sig))
 
 
+class Trusts(unittest.TestCase):
+    """release_key.py trusts: a release program carries every release key, never the test key."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.keys = self.root / "keys"
+        self.keys.mkdir()
+        for name, body in (("release-1", "AAAA1="), ("release-2", "BBBB2=")):
+            (self.keys / f"{name}.pub").write_text(f"-----BEGIN PUBLIC KEY-----\n{body}\n-----END PUBLIC KEY-----\n")
+        self.test_pub = self.root / "test.pub"
+        self.test_pub.write_text("-----BEGIN PUBLIC KEY-----\nTTTT3=\n-----END PUBLIC KEY-----\n")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def program(self, name, *bodies):
+        path = self.root / name
+        path.write_bytes(b"\x7fELF..." + b"...".join(b.encode() for b in bodies) + b"...")
+        path.chmod(0o755)
+        return path
+
+    def trusts(self, path):
+        return release_key.trusts(path, self.keys, self.test_pub)
+
+    def test_a_release_build_carries_both_release_keys_and_not_the_test_key(self):
+        self.assertEqual(self.trusts(self.program("brick", "AAAA1=", "BBBB2=")), [])
+        p = self.program("test-build", "AAAA1=", "BBBB2=", "TTTT3=")
+        self.assertEqual(self.trusts(p), [f"{p} trusts the test key (built with suite-update's test-key feature)"])
+        p = self.program("old", "AAAA1=")
+        self.assertEqual(self.trusts(p), [f"{p} lacks the release key release-2"])
+
+    def test_a_tarball_is_judged_by_the_app_program_in_it(self):
+        import tarfile
+        good = self.program("brick", "AAAA1=", "BBBB2=")
+        bad = self.program("bad", "AAAA1=", "BBBB2=", "TTTT3=")
+        lib = self.program("libgtk.dylib")
+        for tar_name, member, program in (("linux.tar.gz", "brick-1.0.0-x86_64-linux/brick", good),
+                                          ("mac.tar.gz", "Brick.app/Contents/MacOS/brick", bad)):
+            with tarfile.open(self.root / tar_name, "w:gz") as tar:
+                tar.add(program, member)
+                tar.add(lib, "Brick.app/Contents/Frameworks/libgtk.dylib")
+        self.assertEqual(self.trusts(self.root / "linux.tar.gz"), [])
+        self.assertEqual(self.trusts(self.root / "mac.tar.gz"),
+                         [f"{self.root / 'mac.tar.gz'}:Brick.app/Contents/MacOS/brick trusts the test key "
+                          "(built with suite-update's test-key feature)"])
+        with tarfile.open(self.root / "empty.tar.gz", "w:gz") as tar:
+            tar.add(lib, "Brick.app/Contents/Frameworks/libgtk.dylib")
+        self.assertEqual(self.trusts(self.root / "empty.tar.gz"), [f"{self.root / 'empty.tar.gz'} holds no program"])
+
+
 if __name__ == "__main__":
     unittest.main()
