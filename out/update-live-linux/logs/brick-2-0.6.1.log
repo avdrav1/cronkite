@@ -1,8 +1,0 @@
-2026-10-24T13:09:16.117192Z  INFO brick: application starting
-Brick starting...
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA-EGL: warning: MESA-LOADER: failed to retrieve device information
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)
-MESA-EGL: warning: egl: failed to create dri2 screen
-update: Updated to Brick 0.6.1

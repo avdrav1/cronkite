@@ -1,8 +1,0 @@
-2026-10-24T13:09:53.489356Z  INFO brick: application starting
-Brick starting...
-2026-10-24T13:09:53.491880Z  INFO brick: running from the bundle C:\Users\runneradmin\AppData\Local\Programs\Brick
-2026-10-24T13:09:53.531843Z  INFO suite_ui::fonts::fc: fonts: added C:\Users\runneradmin\AppData\Local\Programs\Brick\fonts to fontconfig in 39 ms
-
-(brick.exe:6756): GLib-GIO-WARNING **: 13:09:53.565: win32 session dbus binary not found
-2026-10-24T13:09:53.653586Z  INFO suite_ui::appearance: appearance: light
-update: Updated to Brick 0.6.1

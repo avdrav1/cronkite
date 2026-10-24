@@ -1,9 +1,0 @@
-127.0.0.1 - - [24/Oct/2026 13:09:25] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:26] "GET /brick/install.sh HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:26] "GET /brick/latest.json HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:42] "GET /slate/install.sh HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:42] "GET /slate/latest.json HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:56] "GET /frame/install.sh HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:09:56] "GET /frame/latest.json HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:10:09] "GET /etch/install.sh HTTP/1.1" 200 -
-127.0.0.1 - - [24/Oct/2026 13:10:09] "GET /etch/latest.json HTTP/1.1" 200 -

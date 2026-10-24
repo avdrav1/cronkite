@@ -1,6 +1,0 @@
-﻿Downloading Frame 0.4.0 for Windows
-Installed Frame 0.4.0
-  C:\Users\runneradmin\AppData\Local\Programs\Frame: start it from the Start menu
-  PowerPoint presentations (.pptx .pptm) list it under Open with; to make it their default,
-  right-click a file > Open with > Choose another app > Frame > Always
-

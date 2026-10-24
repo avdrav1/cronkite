@@ -1,9 +1,0 @@
-2026-10-24T13:09:23.684693Z  INFO slate: application starting
-Slate starting...
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA-EGL: warning: MESA-LOADER: failed to retrieve device information
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)
-MESA-EGL: warning: egl: failed to create dri2 screen
-2026-10-24T13:09:24.254086Z  INFO suite_update::apply::linux: update: Slate 0.6.1 installed for the next start
-2026-10-24T13:09:24.261305Z  INFO suite_update: update: Slate 0.6.1 downloaded for the next start

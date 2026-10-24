@@ -1,6 +1,0 @@
-2026-10-24T13:09:50.714985Z  INFO slate: application starting
-Slate starting...
-2026-10-24T13:09:50.717032Z  INFO slate: running from the bundle /Users/runner/Applications/Slate.app/Contents/Resources
-2026-10-24T13:09:50.750331Z  INFO suite_ui::fonts::fc: fonts: added /Users/runner/Applications/Slate.app/Contents/Resources/fonts to fontconfig in 33 ms
-2026-10-24T13:09:50.920895Z  INFO suite_ui::appearance: appearance: light
-update: Updated to Slate 0.6.1

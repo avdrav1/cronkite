@@ -1,9 +1,0 @@
-2026-10-24T13:10:20.923223Z  INFO frame: application starting
-Frame starting...
-2026-10-24T13:10:20.929751Z  INFO frame: running from the bundle C:\Users\runneradmin\AppData\Local\Programs\Frame
-2026-10-24T13:10:21.513992Z  INFO suite_ui::fonts::fc: fonts: added C:\Users\runneradmin\AppData\Local\Programs\Frame\fonts to fontconfig in 583 ms
-
-(frame.exe:6152): GLib-GIO-WARNING **: 13:10:21.539: win32 session dbus binary not found
-2026-10-24T13:10:21.720601Z  INFO suite_ui::appearance: appearance: light
-2026-10-24T13:10:22.899597Z  INFO suite_update: update: Frame 0.4.1 downloaded for the next start
-2026-10-24T13:10:23.836987Z  INFO suite_update::apply::windows: update: installing Frame 0.4.1 (Setup.exe, process 3456, log C:\Users\runneradmin\AppData\Local\Cronkite\Frame\updates\setup.log)

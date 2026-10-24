@@ -1,9 +1,0 @@
-2026-10-24T13:09:37.344971Z  INFO frame: application starting
-Frame starting...
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA-EGL: warning: MESA-LOADER: failed to retrieve device information
-MESA-EGL: warning: failed to get driver name for fd -1
-MESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)
-MESA-EGL: warning: egl: failed to create dri2 screen
-2026-10-24T13:09:37.891128Z  INFO suite_update::apply::linux: update: Frame 0.4.1 installed for the next start
-2026-10-24T13:09:37.896514Z  INFO suite_update: update: Frame 0.4.1 downloaded for the next start

@@ -1,6 +1,0 @@
-2026-10-24T13:10:04.028059Z  INFO frame: application starting
-Frame starting...
-2026-10-24T13:10:04.028946Z  INFO frame: running from the bundle /Users/runner/Applications/Frame.app/Contents/Resources
-2026-10-24T13:10:04.042720Z  INFO suite_ui::fonts::fc: fonts: added /Users/runner/Applications/Frame.app/Contents/Resources/fonts to fontconfig in 13 ms
-2026-10-24T13:10:04.152199Z  INFO suite_ui::appearance: appearance: light
-update: Updated to Frame 0.4.1

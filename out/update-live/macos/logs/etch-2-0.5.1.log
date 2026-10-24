@@ -1,7 +1,0 @@
-2026-10-24T13:10:17.145391Z  INFO etch: application starting
-Etch starting...
-2026-10-24T13:10:17.146384Z  INFO etch: running from the bundle /Users/runner/Applications/Etch.app/Contents/Resources
-2026-10-24T13:10:17.154066Z  WARN suite_ui::fonts::fc: no bundled fonts folder: Word and PowerPoint fonts fall back to similar ones
-2026-10-24T13:10:17.287704Z  INFO suite_ui::appearance: appearance: light
-update: Updated to Etch 0.5.1
-2026-10-24T13:10:17.478132Z  INFO etch::window: opened /Users/runner/work/cronkite/cronkite/out/update-live/macos/files/wide.png: 64×32 in 0 ms
