@@ -9,6 +9,7 @@
 # scripts/check_update_live.sh. Screenshots, logs, and summaries: the update-live artifact.
 name: update-live
 on:
+  push: { branches: [story/upd-7-update-live], paths: [.github/workflows/update-live.yml] }
   workflow_dispatch:
     inputs:
       apps:
