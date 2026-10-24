@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 
 const LOCK: &str = ".lock";
 const PARTIAL: &str = ".download";
-const RECORD: &str = "staged";
+/// The record naming the staged release.
+pub(crate) const RECORD: &str = "staged";
 
 /// A staged release.
 #[derive(Clone, Debug, PartialEq, Eq)]

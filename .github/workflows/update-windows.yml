@@ -1,0 +1,164 @@
+# UPD-6: the apps update themselves on Windows. The bundle job builds each app twice with
+# suite-update's `test-key` feature (an update check's build; releases never enable it):
+# the old version as the repository has it, and a newer one (its version's patch + 1, set in
+# this job's checkout only), each bundled into its Setup.exe by scripts/win_bundle.sh as
+# release-windows.yml does; the newer one's latest.json is signed with the TEST key
+# (crates/suite-update/test-key/test.key, CRONKITE_RELEASE_TEST_KEY=1) for the check's site
+# on 127.0.0.1:8765. The verify job, a fresh runner with MSYS2 moved away, runs
+# scripts/check_win_update.ps1: install.ps1 installs the old one, which stages the newer one
+# and installs it when its last instance quits.
+name: update-windows
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Apps to check (brick slate frame etch)"
+        default: "brick slate frame etch"
+      builds:
+        description: "Reuse this run's update-windows-builds instead of building (a run id)"
+        default: ""
+  push:
+    branches: ["**"]
+    paths:
+      - .github/workflows/update-windows.yml
+      - crates/suite-update/**
+      - scripts/check_win_update.ps1
+      - packaging/windows/setup.iss
+jobs:
+  bundle:
+    if: ${{ !inputs.builds }}
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults: { run: { shell: "msys2 {0}" } }
+    env:
+      CARGO_HOME: D:\cargo-home
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    outputs:
+      apps: ${{ steps.apps.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-librsvg
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-ninja
+            make
+            patch
+            zstd
+      - id: apps
+        name: Which apps
+        shell: bash
+        env: { INPUT_APPS: "${{ inputs.apps }}" }
+        run: |
+          apps=${INPUT_APPS:-brick slate frame etch}
+          for a in $apps; do
+            case $a in brick|slate|frame|etch) ;; *) echo "unknown app $a"; exit 1 ;; esac
+          done
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+      - id: toolchain
+        run: echo "rustc=$(rustc -V | tr -cd '[:alnum:].-')" >> "$GITHUB_OUTPUT"
+      # Its own cache (the test key's builds), started from the release builds' when new.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            D:\cargo-home\registry
+            target/release
+          key: windows-update-${{ steps.toolchain.outputs.rustc }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            windows-update-${{ steps.toolchain.outputs.rustc }}-${{ hashFiles('Cargo.lock') }}-
+            windows-update-${{ steps.toolchain.outputs.rustc }}-
+            windows-release-${{ steps.toolchain.outputs.rustc }}-
+      - uses: actions/cache@v4
+        with: { path: target/win-libs, key: "win-libs-${{ hashFiles('scripts/win_libs.sh') }}" }
+      - name: cairo without lzo, libtiff without jbig
+        run: scripts/win_libs.sh target/win-libs
+      - name: Fetch the bundled fonts
+        shell: pwsh
+        run: python scripts/fetch_fonts.py target/fonts
+      - name: Old and new builds, bundled; the new one's latest.json signed with the test key
+        run: |
+          set -euo pipefail
+          key=$(cygpath -w "$PWD/crates/suite-update/test-key/test.key")
+          tmp=$(mktemp -d)
+          # The repository's versions, put back before each app (MSYS2 has no git).
+          tar -cf "$tmp/versions.tar" Cargo.toml Cargo.lock apps/*/Cargo.toml
+          for a in ${{ steps.apps.outputs.apps }}; do
+            tar -xf "$tmp/versions.tar"
+            old=$(python3 scripts/win_app.py version "$a")
+            cargo build --release --locked -p "$a" --features suite-update/test-key
+            scripts/win_bundle.sh "$a" target/release upd/old-bundles
+            # The newer version: the patch level + 1 where the app's version is (its own
+            # Cargo.toml, else the workspace's), in this checkout only.
+            new=$(python3 - "$a" <<'EOF'
+          import sys
+          from pathlib import Path
+          app = sys.argv[1]
+          for toml in (Path("apps") / app / "Cargo.toml", Path("Cargo.toml")):
+              lines = toml.read_text().splitlines(keepends=True)
+              for i, line in enumerate(lines):
+                  if line.startswith("version = "):
+                      major, minor, patch = line.split('"')[1].split(".")
+                      new = f"{major}.{minor}.{int(patch) + 1}"
+                      lines[i] = f'version = "{new}"\n'
+                      toml.write_text("".join(lines))
+                      print(new)
+                      sys.exit(0)
+          sys.exit(f"no version for {app}")
+          EOF
+            )
+            echo "== $a $old -> $new"
+            cargo build --release -p "$a" --features suite-update/test-key
+            scripts/win_bundle.sh "$a" target/release upd/new-bundles
+            setup=$a-$new-x86_64-windows-setup.exe
+            mkdir -p "upd/site/$a/releases/v$new" upd/old
+            mv "upd/new-bundles/$setup" "upd/site/$a/releases/v$new/"
+            mv "upd/old-bundles/$a-$old-x86_64-windows-setup.exe" upd/old/
+            # latest.json names a Linux tarball; this check never fetches it.
+            : > "$tmp/$a-$new-x86_64-linux.tar.gz"
+            CRONKITE_RELEASE_TEST_KEY=1 CRONKITE_RELEASE_KEY="$key" python3 scripts/release_json.py write "$a" \
+              "http://127.0.0.1:8765/$a/releases/v$new" "$new" "$(cygpath -w "$tmp/$a-$new-x86_64-linux.tar.gz")" \
+              none none "$(cygpath -w "$PWD/upd/site/$a/releases/v$new/$setup")" "$(cygpath -w "$PWD/upd/site/$a/latest.json")"
+            cat "upd/site/$a/latest.json" "upd/site/$a/latest.json.sig"
+          done
+          tar -xf "$tmp/versions.tar"
+          ls -lR upd/old upd/site
+      - uses: actions/upload-artifact@v4
+        with: { name: update-windows-builds, path: "upd/old\nupd/site", if-no-files-found: error, compression-level: 0 }
+  verify:
+    # A fresh runner with MSYS2 moved away and a PATH of Windows' own folders.
+    needs: bundle
+    if: ${{ !cancelled() && (needs.bundle.result == 'success' || (needs.bundle.result == 'skipped' && inputs.builds)) }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions: { contents: read, actions: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: update-windows-builds
+          path: upd
+          run-id: ${{ inputs.builds || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Move MSYS2 away
+        shell: pwsh
+        run: if (Test-Path C:\msys64) { Rename-Item C:\msys64 C:\msys64-away }
+      - name: Install the old version, update it by quitting, refuse tampered releases
+        shell: powershell
+        run: '& .\scripts\check_win_update.ps1 -Old upd\old -Site upd\site -Apps "${{ needs.bundle.outputs.apps || inputs.apps }}"'
+      - name: MSYS2 back
+        if: always()
+        shell: pwsh
+        run: if (Test-Path C:\msys64-away) { Rename-Item C:\msys64-away C:\msys64 }
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: windows-update, path: "out/win-update/shots\nout/win-update/logs\nout/win-update/summary.txt", if-no-files-found: warn }

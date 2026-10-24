@@ -12,6 +12,9 @@
 ; a Start menu entry and an entry in Settings > Apps (HKCU's Uninstall key). File types are
 ; offered through Open with and Default apps; Windows keeps the user's defaults. Silent:
 ; Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER (what install.ps1 runs).
+; The app's updater (UPD-6, crates/suite-update) adds /NOCLOSEAPPLICATIONS: then Setup closes
+; nothing; it waits up to 30 s for the program to be free and otherwise stops, exit code 7,
+; before changing anything (PrepareToInstall below).
 #ifndef AppDefs
   #error Build it with scripts/win_bundle.sh (iscc /DAppDefs=... /DSource=... /DOutputDir=...)
 #endif
@@ -71,6 +74,63 @@ Name: "{autoprograms}\{#Name}"; Filename: "{app}\bin\{#App}.exe"; IconFilename: 
 Filename: "{app}\bin\{#App}.exe"; Description: "{cm:LaunchProgram,{#Name}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Told not to close applications (/NOCLOSEAPPLICATIONS: the app's updater, UPD-6), Setup
+// replaces nothing under a running program: Inno would otherwise delete what it can of the
+// old bundle, then fail on the files the program holds. It waits up to 30 s for the
+// installed program to be free (the instance that started Setup finishing its exit), then
+// stops before changing anything, exit code 7. Other runs keep CloseApplications.
+function NoCloseApplications(): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/NOCLOSEAPPLICATIONS') = 0 then
+      Result := True;
+end;
+
+// Whether a process runs the installed program: a running program can't be opened for
+// writing, with no sharing.
+function ProgramRunning(const Exe: String): Boolean;
+var
+  Stream: TFileStream;
+begin
+  Result := False;
+  if not FileExists(Exe) then
+    Exit;
+  try
+    // fmOpenWrite or fmShareExclusive; nothing is written.
+    Stream := TFileStream.Create(Exe, $0001 or $0010);
+    Stream.Free;
+  except
+    Result := True;
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Exe: String;
+  Waited: Integer;
+begin
+  Result := '';
+  if not NoCloseApplications() then
+    Exit;
+  Exe := ExpandConstant('{app}\bin\{#App}.exe');
+  Waited := 0;
+  while ProgramRunning(Exe) and (Waited < 30000) do
+  begin
+    Sleep(250);
+    Waited := Waited + 250;
+  end;
+  if ProgramRunning(Exe) then
+  begin
+    Log(Format('%s is running after %d ms; nothing changed', [Exe, Waited]));
+    Result := '{#Name} is running. Quit it, then run Setup again.';
+  end
+  else
+    Log(Format('%s is free after %d ms', [Exe, Waited]));
+end;
+
 // The user's own files stay (Windows' convention; as the Linux and macOS installers keep
 // theirs): settings and recent files in %APPDATA%\Cronkite\<Name>, recovery journals and
 // state in %LOCALAPPDATA%\Cronkite\<Name> (WIN-2). Uninstalling by hand asks whether to

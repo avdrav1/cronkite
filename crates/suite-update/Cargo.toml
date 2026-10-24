@@ -32,6 +32,10 @@ base64 = "0.23"
 tar = { version = "0.4", default-features = false }
 flate2 = "1"
 
+# Starting the staged Setup.exe detached at the last instance's exit (UPD-6).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading"] }
+
 [lints]
 workspace = true
 
