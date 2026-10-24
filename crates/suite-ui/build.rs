@@ -1,7 +1,7 @@
-//! macOS: compile the app menu GTK builds, with "Update Automatically" (ADR 0012), into a
-//! GResource bundle that `chrome::macos_app_menu` registers over GTK's own. Needs GLib's
-//! `glib-compile-resources` (Homebrew's glib, which gtk4 brings), or `GLIB_COMPILE_RESOURCES`
-//! naming it. Nothing elsewhere.
+//! macOS: compile the suite's app menu (`data/app-menu.ui`, with "Update Automatically",
+//! ADR 0012) into a GResource bundle that `chrome::macos_app_menu` registers over GTK's own.
+//! Needs GLib's `glib-compile-resources` (Homebrew's glib, which gtk4 brings), or
+//! `GLIB_COMPILE_RESOURCES` naming it. Nothing elsewhere.
 
 use std::path::PathBuf;
 use std::process::Command;

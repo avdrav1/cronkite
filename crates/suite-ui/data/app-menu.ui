@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The suite's app menu on macOS: About <App>, Update Automatically | Services | Hide,
+     Hide Others, Show All | Quit. GTK's macOS backend builds the menu bar's app menu from
+     the "app-menu" menu at the resource path /org/gtk/libgtk/ui/gtkapplication-quartz.ui,
+     which app-menu.gresource.xml gives this file, and takes "default-menu" there as the menu
+     bar of an application without one at its startup (the apps set theirs right after it,
+     so it is empty). suite_ui::chrome::macos_app_menu registers it ahead of GTK's own.
+     The `gtk-macos-special` values GTK's backend acts on: replace-appname (the "%s" in
+     the label becomes the app's name), services-submenu (AppKit's Services menu), and
+     hide-this, hide-others, and show-all (AppKit's own items, run by GTK's
+     gtkinternal.* actions). Labels are English, like the rest of the apps' menus, so
+     there is no translation domain. -->
+<interface>
+  <menu id="app-menu">
+    <section>
+      <item>
+        <attribute name="label">About %s</attribute>
+        <attribute name="action">app.about</attribute>
+        <attribute name="gtk-macos-special">replace-appname</attribute>
+      </item>
+      <item>
+        <attribute name="label">Update Automatically</attribute>
+        <attribute name="action">app.update-automatically</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">Services</attribute>
+        <attribute name="gtk-macos-special">services-submenu</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">Hide %s</attribute>
+        <attribute name="action">gtkinternal.hide</attribute>
+        <attribute name="gtk-macos-special">hide-this</attribute>
+      </item>
+      <item>
+        <attribute name="label">Hide Others</attribute>
+        <attribute name="action">gtkinternal.hide-others</attribute>
+        <attribute name="gtk-macos-special">hide-others</attribute>
+      </item>
+      <item>
+        <attribute name="label">Show All</attribute>
+        <attribute name="action">gtkinternal.show-all</attribute>
+        <attribute name="gtk-macos-special">show-all</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">Quit %s</attribute>
+        <attribute name="action">app.quit</attribute>
+        <attribute name="gtk-macos-special">replace-appname</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="default-menu"/>
+</interface>
