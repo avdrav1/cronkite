@@ -51,9 +51,9 @@ fn file_name(path: &Path) -> String {
     )
 }
 
-/// The header bar every window has on Linux: New (Ctrl+N) and Open (Ctrl+O) buttons.
-/// macOS and Windows windows keep their own title bar, and New and Open are in the menu
-/// bar.
+/// The header bar every window has on Linux: New (Ctrl+N) and Open (Ctrl+O) buttons, and
+/// at its end the main menu (Update Automatically, About Frame). macOS and Windows windows
+/// keep their own title bar, and New and Open are in the menu bar.
 fn put_header(window: &gtk::ApplicationWindow) {
     if suite_ui::chrome::MENU_BAR {
         return;
@@ -69,6 +69,9 @@ fn put_header(window: &gtk::ApplicationWindow) {
     open.set_tooltip_text(Some(&format!("Open… ({})", keys::label(Action::Open))));
     open.update_property(&[gtk::accessible::Property::Label("Open")]);
     bar.pack_start(&open);
+    bar.pack_end(&suite_ui::chrome::main_menu(
+        &suite_ui::chrome::app_section(crate::APP),
+    ));
     window.set_titlebar(Some(&bar));
 }
 
@@ -248,7 +251,7 @@ pub fn open(app: &gtk::Application, path: &Path, bench: Option<u32>) {
     spinner.start();
     opening.append(&spinner);
     opening.append(&gtk::Label::new(Some("Opening…")));
-    window.set_child(Some(&opening));
+    window.set_child(Some(&suite_ui::notice::host(&opening)));
     accept_file_drops(app, &window);
     OPEN.with_borrow_mut(|open| open.push((canonical(path), window.downgrade())));
     window.present();
@@ -689,7 +692,7 @@ fn show_deck(
     page.append(&paned);
     page.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     page.append(&status);
-    window.set_child(Some(&page));
+    window.set_child(Some(&suite_ui::notice::host(&page)));
 
     let view = Rc::new_cyclic(|weak| DeckWindow {
         app: app.clone(),

@@ -31,7 +31,13 @@ use std::path::PathBuf;
 
 /// Run `app` with `files` from the command line: they reach its `open` handler; without
 /// any, `activate`. Relative paths are made absolute first, against the working folder.
+/// On macOS a GTK application's GTK starts first, so its app menu has "Update
+/// Automatically" (`chrome::macos_app_menu`).
 pub fn run(app: &impl IsA<gio::Application>, files: &[PathBuf]) -> glib::ExitCode {
+    #[cfg(target_os = "macos")]
+    if app.is::<gtk::Application>() {
+        crate::chrome::macos_app_menu();
+    }
     let files: Vec<gio::File> = files
         .iter()
         .map(|f| gio::File::for_path(std::path::absolute(f).unwrap_or_else(|_| f.clone())))

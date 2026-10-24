@@ -149,6 +149,8 @@ fn main() -> glib::ExitCode {
     eprintln!("{}", suite_ui::startup_message(APP));
     // This run's part in applying updates (ADR 0012); before the bundle's environment.
     let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
+    // "Updated to Brick X.Y.Z" in the first window, at the first start after an update.
+    suite_ui::notice::queue(suite_update::notice(APP, env!("CARGO_PKG_VERSION")));
     // Before the file's indexing threads start: these may set the environment (macOS).
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
@@ -252,7 +254,11 @@ fn main() -> glib::ExitCode {
             })
             .build();
         app.add_action_entries([open, new, open_recent, clear_recent, close, quit]);
-        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"));
+        let update = suite_ui::chrome::AutoUpdate {
+            on: suite_update::automatic(APP),
+            keep: |on| suite_update::set_automatic(APP, on),
+        };
+        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"), update);
         if suite_ui::chrome::MENU_BAR {
             app.set_menubar(Some(&menus::bar()));
         }
@@ -472,13 +478,15 @@ fn start_window(app: &gtk::Application) -> gtk::ApplicationWindow {
         .title("Brick")
         .default_width(900)
         .default_height(600)
-        .child(&page)
+        .child(&suite_ui::notice::host(&page))
         .build();
     window.set_widget_name(START_WINDOW);
     accept_file_drops(app, &window);
-    // Linux's empty header bar; macOS and Windows keep their own title bar.
+    // Linux's header bar with the main menu; macOS and Windows keep their own title bar.
     if !suite_ui::chrome::MENU_BAR {
-        window.set_titlebar(Some(&gtk::HeaderBar::new()));
+        let header = gtk::HeaderBar::new();
+        header.pack_end(&main_menu());
+        window.set_titlebar(Some(&header));
     }
     // Enter acts on it: Restore after a crash, else Open.
     let first = restore.unwrap_or(open);
@@ -526,6 +534,11 @@ fn recent_menu() -> gtk::MenuButton {
         button.set_menu_model(Some(&menu));
     });
     button
+}
+
+/// A Linux header bar's main menu: Update Automatically and About Brick.
+fn main_menu() -> gtk::MenuButton {
+    suite_ui::chrome::main_menu(&suite_ui::chrome::app_section(APP))
 }
 
 /// Put `path` at the top of the recent files; a failure only costs the list.
@@ -954,7 +967,7 @@ fn build_window(
         .title(session.name())
         .default_width(1400)
         .default_height(900)
-        .child(&layout)
+        .child(&suite_ui::notice::host(&layout))
         .build();
     OPEN_WINDOWS.with_borrow_mut(|open| open.push((session.clone(), window.downgrade())));
     // Crash recovery (APP-7), except in benchmarks, which measure the app alone: journal
@@ -992,7 +1005,7 @@ fn build_window(
     let delimiter = delimiter_dropdown(session, &grid);
     let save = Rc::new(RefCell::new(SaveState::Idle));
     // The window's buttons. Linux: the header bar with Open, Recent, New, and Save As, then
-    // the delimiter and Header row. macOS and Windows have those commands in the menu bar:
+    // the main menu, the delimiter, and Header row. macOS and Windows have those commands in the menu bar:
     // the delimiter and Header row are a toolbar row over the format bar.
     let toolbar = Toolbar::new();
     if !suite_ui::chrome::MENU_BAR {
@@ -1015,6 +1028,7 @@ fn build_window(
         toolbar.pack_start(&recent_menu());
         toolbar.pack_start(&new);
         toolbar.pack_start(&save_as_button);
+        toolbar.pack_end(&main_menu());
     }
     toolbar.pack_end(&delimiter);
     let header_row = header_toggle(session, &grid);
