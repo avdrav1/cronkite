@@ -260,15 +260,22 @@ fn a_later_release_replaces_the_staged_one() {
     let w = World::new();
     w.serve_release("0.6.0", TARBALL);
     run(&w.check()).unwrap();
+    let updates = w.check().updates;
+    // 0.6.0 applied, its first start still to come when 0.7.0 is staged.
+    session::record_applied(&updates, "0.6.0").unwrap();
     let newer = b"brick 0.7.0".to_vec();
     w.serve_release("0.7.0", &newer);
     assert_eq!(run(&w.check()).unwrap(), Outcome::Staged("0.7.0".into()));
-    let updates = w.check().updates;
     assert_eq!(
         std::fs::read(staged(&updates).unwrap().file).unwrap(),
         newer
     );
     assert!(!updates.join("brick-0.6.0.tar.gz").exists());
+    assert_eq!(
+        session::notice_in(&updates, AppKind::Brick, "0.6.0").as_deref(),
+        Some("Updated to Brick 0.6.0"),
+        "staging keeps the applied record"
+    );
 }
 
 #[test]
