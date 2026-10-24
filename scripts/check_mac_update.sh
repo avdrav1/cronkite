@@ -24,8 +24,8 @@
 #   2. a second running instance defers the swap: two instances run while 99.0.4 is staged;
 #      quitting the first (⌘Q) leaves 99.0.3 installed, quitting the second swaps 99.0.4 in;
 #   3. quitting then starting runs the new version: 99.0.5 staged, ⌘Q swaps it in, and the
-#      next start is 99.0.5 with the notice (the "update: Updated to <App> 99.0.5" line once
-#      the app shows it, else the `applied` record the notice reads);
+#      next start is 99.0.5 with the notice: its banner (screenshot) and the line
+#      "update: Updated to <App> 99.0.5" on stderr, once (each start after a swap has it);
 #   after each swap the bundle's ad-hoc signature verifies (`codesign --verify --deep
 #   --strict`), it carries no quarantine attribute, and nothing is left beside it;
 #   4. tampered releases are refused, 99.0.5 stays and still starts: a changed tarball, a
@@ -229,14 +229,13 @@ check_app() {
     [[ -z $beside ]] && pass "$app: $what: nothing left beside $name.app" ||
       fail "$app: $what: left beside it: $beside"
   }
-  # The notice for version $1 in the start logged at $2: the line once the app shows it
-  # (UPD-3), else the record it reads.
+  # The notice for version $1 in the start logged at $2: the app logs
+  # "update: Updated to <App> X" when its first window shows the banner (UPD-3), which
+  # consumes the `applied` record.
   notice_ok() {
     local v=$1 log=$2
-    if grep -q "update: Updated to $name $v" "$log"; then
-      pass "$app: the start says \"$(grep -o "Updated to $name $v" "$log" | head -1)\""
-    elif grep -qx "version=$v" "$updates/applied" 2>/dev/null; then
-      pass "$app: the applied record for the notice: $(cat "$updates/applied") (this build shows no notice yet)"
+    if grep -q "update: Updated to $name $v" "$log" && [[ ! -e $updates/applied ]]; then
+      pass "$app: the start says \"$(grep -o "Updated to $name $v" "$log" | head -1)\" (record consumed)"
     else
       fail "$app: no notice for $v: $(grep 'update:' "$log" | tr '\n' '|'); applied: $(cat "$updates/applied" 2>&1)"
     fi
@@ -308,6 +307,7 @@ check_app() {
   bundle_ok "$v4" "after both quit"
   log=$logs/$app-2-next-start.log
   launch v4 "$log" && {
+    shot "$app-2-updated"
     notice_ok "$v4" "$log"
     quit "$pid"
   }
@@ -322,6 +322,11 @@ check_app() {
   grep -q "update: .* $v5 swapped in" "$log" &&
     pass "$app: ⌘Q swapped $v5 in" || fail "$app: ⌘Q: $(grep 'update:' "$log" | tr '\n' '|')"
   bundle_ok "$v5" "after quitting"
+  # What Launch Services has for the swapped bundle (Finder's Get Info): noted, to tell
+  # whether the swap should re-register it (lsregister -f).
+  local ls=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+  "$ls" -dump 2>/dev/null | awk -v p="$appdir" 'index($0, "path:") && index($0, p) && !done {on = 1} on && /^-+$/ {on = 0; done = 1} on' >"$logs/$app-3-lsregister.txt"
+  note "$app: Launch Services after the swap: $(grep -E '^(path|version|versionString|CFBundleShortVersionString|bundle version) *:' "$logs/$app-3-lsregister.txt" | tr -s ' ' | tr '\n' '|'); Info.plist: $(plutil -extract CFBundleShortVersionString raw "$appdir/Contents/Info.plist" 2>&1)"
   log=$logs/$app-3-next-start.log
   launch "v$last" "$log" || return
   shot "$app-3-updated"
@@ -359,6 +364,8 @@ check_app() {
   launch "v$last" "$log" && {
     shot "$app-4-still-starts"
     pass "$app: $(installed) still starts after the tampered releases"
+    ! grep -q "Updated to" "$logs"/$app-4-*.log && pass "$app: no notice at the starts after the one that showed it" ||
+      fail "$app: a notice again: $(grep -h 'Updated to' "$logs"/$app-4-*.log | tr '\n' '|')"
     quit "$pid"
   }
 
