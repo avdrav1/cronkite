@@ -81,7 +81,7 @@
       <section id="install">
         <h2>Install</h2>
         <div id="install-unix">
-          <p>For your user, no sudo, on Linux or a Mac. Run the command again to update.</p>
+          <p>For your user, no sudo, on Linux or a Mac.</p>
           <pre id="cmd">curl -fsSL https://this-site/install.sh | sh</pre>
           <p>On Linux it installs the app and its menu entry; start it from your app menu or with <code>etch</code>. It makes Etch the default app for PNG, JPEG, and BMP images, so double-clicking one opens it in Etch; other file types keep their apps, and removing Etch drops its defaults. It needs GTK 4, which GNOME desktops have; otherwise the installer says how to get it.</p>
           <p>On a Mac with Apple Silicon and macOS 14 or later, it puts Etch in your Applications folder, with everything it needs inside. PNG, JPEG, and BMP images list Etch under Open With; to open them with Etch by default, select one in Finder, then File &gt; Get Info &gt; Open with &gt; Change All.</p>
@@ -89,12 +89,13 @@
           <pre id="uninstall">curl -fsSL https://this-site/install.sh | sh -s -- --uninstall</pre>
         </div>
         <div id="install-windows">
-          <p>On Windows 10 and 11, 64-bit (a preview): for your user, no admin rights. Paste this into PowerShell; run it again to update.</p>
+          <p>On Windows 10 and 11, 64-bit (a preview): for your user, no admin rights. Paste this into PowerShell.</p>
           <pre id="ps-cmd">irm https://this-site/install.ps1 | iex</pre>
           <p>It puts Etch in your user's Programs folder, with everything it needs inside, and in the Start menu. PNG, JPEG, and BMP images list Etch under Open with, and Windows keeps your default apps; to open them with Etch by default, right-click one, then Open with &gt; Choose another app &gt; Etch &gt; Always.</p>
           <p>To remove it, use Settings &gt; Apps &gt; Installed apps, or:</p>
           <pre id="ps-uninstall">&amp; ([scriptblock]::Create((irm https://this-site/install.ps1))) -Uninstall</pre>
         </div>
+        <p id="updates">Etch updates itself: when it starts, it checks for a newer release, downloads it in the background, and runs it from the next start. It installs only releases signed with Cronkite's key. To turn that off, uncheck Update Automatically (Help on Linux, the Etch menu on a Mac, Help on Windows), or start it with <code>CRONKITE_NO_UPDATE=1</code> set. A copy installed before Etch updated itself needs the install command run once more.</p>
         <h2>Downloads</h2>
         <ul id="downloads"><li>No release published yet</li></ul>
         <div id="gatekeeper">

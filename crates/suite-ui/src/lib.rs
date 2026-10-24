@@ -3,7 +3,8 @@
 //! uses (Control on Linux and Windows, Command on macOS), [`im`], input methods for the
 //! apps' own text widgets, and [`chrome`], where menus and a window's buttons go (header
 //! bars on Linux; the system's title bars, a menu bar, and a toolbar row on macOS and
-//! Windows) and the About dialog.
+//! Windows), "Update Automatically", and the About dialog; [`notice`] shows
+//! `Updated to <App> X.Y.Z` once after an update.
 //!
 //! [`fonts`] chooses how text finds its fonts and adds the bundled ones on macOS;
 //! [`appearance`] switches the theme (and Windows' title bars) between light and dark;
@@ -18,6 +19,7 @@ pub mod fonts;
 pub mod im;
 pub mod keys;
 pub mod launch;
+pub mod notice;
 pub mod renderer;
 
 use suite_core::AppKind;
