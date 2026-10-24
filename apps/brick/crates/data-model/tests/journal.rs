@@ -325,6 +325,32 @@ fn damaged_journals_of_either_version_are_refused() {
     ));
 }
 
+/// Every byte of a journal with a bit flipped is refused, not just the middle one: a
+/// length's high byte flipped once asked for 274 GB and aborted (CI, 2026-10-24).
+#[test]
+fn a_bit_flipped_anywhere_is_refused_without_allocating_what_it_claims() {
+    let (data, imported, gone) = (
+        file("flip-data", DATA),
+        file("flip-imported", IMPORTED),
+        file("flip-gone", GONE),
+    );
+    let mut book = fresh(&data.0, &imported.0, &gone.0);
+    crashed_session(&mut book);
+    let v2 = journal(&book, &header(Some(&data.0), FileKind::Xlsx));
+    let v1 = std::fs::read(fixture("v1.journal")).unwrap();
+    for bytes in [&v2, &v1] {
+        for i in 0..bytes.len() {
+            let mut flipped = bytes.clone();
+            flipped[i] ^= 0x40;
+            assert!(
+                matches!(read_book_journal(&flipped[..]), Err(JournalError::Corrupt(_))),
+                "byte {i} of {}",
+                bytes.len()
+            );
+        }
+    }
+}
+
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/data")

@@ -313,9 +313,14 @@ impl<R: Read> Reader<R> {
             hash: Fnv::new(),
         }
     }
+    /// `n` bytes, the buffer growing as they arrive: a damaged length that passed `count`
+    /// (up to a terabyte) ends as "cut short" at the journal's end instead of allocating it.
     fn bytes(&mut self, n: usize) -> Result<Vec<u8>, JournalError> {
-        let mut b = vec![0; n];
-        self.inner.read_exact(&mut b)?;
+        let mut b = Vec::with_capacity(n.min(1 << 20));
+        (&mut self.inner).take(n as u64).read_to_end(&mut b)?;
+        if b.len() != n {
+            return Err(JournalError::Corrupt("cut short"));
+        }
         self.hash.feed(&b);
         Ok(b)
     }
