@@ -95,11 +95,16 @@ pub fn stage(
         release.version, d.sha256
     );
     write_replacing(&updates.join(RECORD), record.as_bytes())?;
-    // The older release files; the owner locks (UPD-5) stay.
+    // The older release files; the owner locks (UPD-5) and the applied record (its
+    // version's notice, still to show) stay.
     for entry in fs::read_dir(updates)?.flatten() {
         let n = entry.file_name();
         let n = n.to_string_lossy();
-        let keep = n == LOCK || n == RECORD || n == name || n.starts_with("owner-");
+        let keep = n == LOCK
+            || n == RECORD
+            || n == name
+            || n == crate::session::APPLIED
+            || n.starts_with("owner-");
         if !keep {
             let path = entry.path();
             let _ = if path.is_dir() {
