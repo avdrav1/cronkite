@@ -69,11 +69,12 @@ def new(key_dir, name, keys=KEYS):
     return key, pub
 
 
-def sign(key, data):
-    """Base64 of the Ed25519 signature of `data` (bytes) with the private key file `key`."""
+def sign(key, data, test=False):
+    """Base64 of the Ed25519 signature of `data` (bytes) with the private key file `key`.
+    `test`: the key is suite-update's test key, which lives in the repository."""
     if not Path(key).is_file():
         raise KeyProblem(f"{key}: no such key file")
-    if inside_repo(key):
+    if inside_repo(key) and not test:
         raise KeyProblem(f"{key} is inside the repository; keep the release key outside it")
     with tempfile.TemporaryDirectory() as tmp:
         msg = Path(tmp) / "msg"

@@ -200,6 +200,26 @@ class Signature(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout.strip()),
                          (1, f"FAIL {self.out}: {self.out}.sig missing: unsigned (set CRONKITE_RELEASE_KEY and write it again)"))
 
+    def test_the_update_checks_sign_with_the_test_key_only_when_asked(self):
+        script = str(Path(release_json.__file__))
+        args = [sys.executable, script, "write", "slate", URL, "1.2.3", str(self.dist / "slate-1.2.3-x86_64-linux.tar.gz"),
+                "none", "none", "none", str(self.out)]
+        test_key = release_json.TEST_KEYS / "test.key"
+        # Without the switch the test key is a key inside the repository: refused.
+        r = subprocess.run(args, env=dict(os.environ, CRONKITE_RELEASE_KEY=str(test_key)), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("inside the repository", r.stderr)
+        # With it, a release key is refused, and the test key signs what only test.pub verifies.
+        test = dict(os.environ, CRONKITE_RELEASE_TEST_KEY="1")
+        r = subprocess.run(args, env=dict(test, CRONKITE_RELEASE_KEY=str(self.key)), capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stderr.strip()),
+                         (1, f"release_json: CRONKITE_RELEASE_TEST_KEY=1 signs only with {test_key}"))
+        r = subprocess.run(args, env=dict(test, CRONKITE_RELEASE_KEY=str(test_key)), capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        data, sig = self.out.read_bytes(), Path(f"{self.out}.sig").read_text()
+        self.assertEqual(release_key.verifies(data, sig, release_json.TEST_KEYS), "test")
+        self.assertIsNone(release_key.verifies(data, sig))
+
 
 if __name__ == "__main__":
     unittest.main()

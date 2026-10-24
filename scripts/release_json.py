@@ -18,7 +18,9 @@ With CRONKITE_RELEASE_KEY naming the release's private key (outside the reposito
 release_key.py), `write` also writes OUT.sig: the base64 Ed25519 signature of OUT's exact
 bytes, which must verify with one of the public keys in packaging/release-keys (ADR 0012).
 Without it OUT is written unsigned and a stale OUT.sig removed, so `check` fails until the
-release is signed.
+release is signed. The update checks (scripts/check_update.sh and its macOS and Windows
+twins) set CRONKITE_RELEASE_TEST_KEY=1 and CRONKITE_RELEASE_KEY to
+crates/suite-update/test-key/test.key: signed with the key only `test-key` builds trust.
 
 `check` compares LATEST_JSON with the files in DIST: every download it names is there, with
 its sha256 and size, named for its app, and the top-level fields are Linux's; and
@@ -34,6 +36,11 @@ from pathlib import Path
 import release_key
 
 KEY = "CRONKITE_RELEASE_KEY"
+# Update checks only (UPD-4 to UPD-6): CRONKITE_RELEASE_TEST_KEY=1 signs with the test key
+# the apps trust under suite-update's `test-key` feature; CRONKITE_RELEASE_KEY must then name
+# exactly crates/suite-update/test-key/test.key, and the signature must verify with test.pub.
+TEST_KEY = "CRONKITE_RELEASE_TEST_KEY"
+TEST_KEYS = release_key.ROOT / "crates" / "suite-update" / "test-key"
 
 
 def _file(url, path):
@@ -57,14 +64,15 @@ def dumps(rel):
     return json.dumps(rel, separators=(",", ":"))
 
 
-def write(rel, out, key=None, keys=release_key.KEYS):
+def write(rel, out, key=None, keys=release_key.KEYS, test=False):
     """Write `rel` to `out` and, with `key`, its signature to `out`.sig; True when signed.
-    Raises release_key.KeyProblem for a key that can't sign or isn't one of `keys`."""
+    Raises release_key.KeyProblem for a key that can't sign or isn't one of `keys`. `test`:
+    `key` is the update checks' test key (TEST_KEY)."""
     data = (dumps(rel) + "\n").encode()
     sig_path = Path(f"{out}.sig")
     signature = None
     if key:
-        signature = release_key.sign(key, data)
+        signature = release_key.sign(key, data, test=test)
         if not release_key.verifies(data, signature, keys):
             raise release_key.KeyProblem(f"{key} isn't the private half of any key in {keys}")
     Path(out).write_bytes(data)
@@ -128,7 +136,13 @@ def main(argv):
         date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
         rel = release(*argv[2:9], date)
         try:
-            signed = write(rel, argv[9], os.environ.get(KEY))
+            if os.environ.get(TEST_KEY) == "1":
+                key = os.environ.get(KEY)
+                if not key or Path(key).resolve() != TEST_KEYS / "test.key":
+                    raise release_key.KeyProblem(f"{TEST_KEY}=1 signs only with {TEST_KEYS / 'test.key'}")
+                signed = write(rel, argv[9], key, keys=TEST_KEYS, test=True)
+            else:
+                signed = write(rel, argv[9], os.environ.get(KEY))
         except release_key.KeyProblem as e:
             print(f"release_json: {e}", file=sys.stderr)
             return 1
