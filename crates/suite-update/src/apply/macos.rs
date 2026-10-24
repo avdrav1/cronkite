@@ -10,6 +10,10 @@
 //!   own place (`execv`, same arguments and pid), so the first window is the new version's.
 //!   That start carries `CRONKITE_UPDATE_RELAUNCHED` (the version it came from), so it
 //!   never swaps and runs itself again: no loop, whatever the bundle holds.
+//!
+//! After a swap the bundle is registered with Launch Services again (`lsregister -f`, as
+//! `install.sh` does), which otherwise keeps the old version's record (Finder's Get Info,
+//! the document types) until the app next runs.
 
 use super::mac_bundle::{self, Applied};
 use crate::session::{others_running, Session};
@@ -18,6 +22,9 @@ use std::path::{Path, PathBuf};
 
 /// Set on the run [`at_launch`] starts in its own place: the version it updated from.
 const RELAUNCHED: &str = "CRONKITE_UPDATE_RELAUNCHED";
+
+/// Launch Services' registration tool, as `install.sh` runs it.
+const LSREGISTER: &str = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
 
 pub(super) fn at_launch(session: &Session) {
     if let Some(from) = std::env::var_os(RELAUNCHED) {
@@ -75,6 +82,7 @@ fn apply(session: &Session, updates: &Path, bundle: &Path) -> bool {
     }) {
         Ok(Applied::Version(v)) => {
             tracing::info!("update: {app} {v} swapped in at {}", bundle.display());
+            register(bundle);
             true
         }
         Ok(Applied::Deferred) => {
@@ -103,6 +111,25 @@ fn relaunch(session: &Session, bundle: &Path) {
     }
     let err = command.args(args).env(RELAUNCHED, session.running).exec();
     tracing::warn!("update: can't start {}: {err}", exe.display());
+}
+
+/// Register `bundle` with Launch Services again, so it has the new version's record.
+fn register(bundle: &Path) {
+    let out = std::process::Command::new(LSREGISTER)
+        .arg("-f")
+        .arg(bundle)
+        .stdin(std::process::Stdio::null())
+        .output();
+    match out {
+        Ok(o) if o.status.success() => {}
+        Ok(o) => tracing::warn!(
+            "update: lsregister -f {}: {} {}",
+            bundle.display(),
+            o.status,
+            String::from_utf8_lossy(&o.stderr).trim()
+        ),
+        Err(e) => tracing::warn!("update: lsregister: {e}"),
+    }
 }
 
 #[cfg(test)]

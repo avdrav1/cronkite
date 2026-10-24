@@ -322,11 +322,13 @@ check_app() {
   grep -q "update: .* $v5 swapped in" "$log" &&
     pass "$app: ⌘Q swapped $v5 in" || fail "$app: ⌘Q: $(grep 'update:' "$log" | tr '\n' '|')"
   bundle_ok "$v5" "after quitting"
-  # What Launch Services has for the swapped bundle (Finder's Get Info): noted, to tell
-  # whether the swap should re-register it (lsregister -f).
+  # Launch Services has the new version's record (Finder's Get Info): the swap registers
+  # the bundle again (lsregister -f), else its record stays the old one until the app runs.
   local ls=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
   "$ls" -dump 2>/dev/null | awk -v p="$appdir" 'index($0, "path:") && index($0, p) && !done {on = 1} on && /^-+$/ {on = 0; done = 1} on' >"$logs/$app-3-lsregister.txt"
-  note "$app: Launch Services after the swap: $(grep -E '^(path|version|versionString|CFBundleShortVersionString|bundle version) *:' "$logs/$app-3-lsregister.txt" | tr -s ' ' | tr '\n' '|'); Info.plist: $(plutil -extract CFBundleShortVersionString raw "$appdir/Contents/Info.plist" 2>&1)"
+  if grep -Eq "^versionString: *$v5\$" "$logs/$app-3-lsregister.txt"; then
+    pass "$app: Launch Services has $v5 after the swap: $(grep -E '^(path|versionString):' "$logs/$app-3-lsregister.txt" | tr -s ' ' | tr '\n' '|')"
+  else fail "$app: Launch Services after the swap: $(grep -E '^(path|versionString):' "$logs/$app-3-lsregister.txt" | tr -s ' ' | tr '\n' '|')"; fi
   log=$logs/$app-3-next-start.log
   launch "v$last" "$log" || return
   shot "$app-3-updated"
