@@ -2,7 +2,7 @@
 # away): an installed app updates itself through the staged Setup.exe when its last running
 # instance quits.
 #
-#   powershell -File scripts\check_win_update.ps1 [-Old DIR] [-Site DIR] [-Apps "brick slate frame etch"] [-Out out\win-update] [-RequireNotice]
+#   powershell -File scripts\check_win_update.ps1 [-Old DIR] [-Site DIR] [-Apps "brick slate frame etch"] [-Out out\win-update]
 #
 # Windows PowerShell 5.1 on an interactive desktop (GitHub's windows-latest). OLD holds each
 # app's old Setup.exe (<app>-<old>-x86_64-windows-setup.exe); SITE holds each app's newer
@@ -27,8 +27,8 @@
 #      /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /NOCLOSEAPPLICATIONS, running
 #      on after the app has exited; Settings > Apps then shows the new version, --version
 #      prints it, and updates\applied names it;
-#   7. the next start reports it: stderr's "update: Updated to <Name> <new>" (UPD-3's
-#      notice; required with -RequireNotice), its window screenshotted; at its exit the
+#   7. the next start reports it: stderr's "update: Updated to <Name> <new>" as its window
+#      shows the notice (UPD-3), screenshotted; at its exit the
 #      installed Setup.exe and its record leave the updates folder.
 # Programs and Features and Settings > Apps are screenshotted with the new versions.
 # Screenshots land in $Out\shots, logs in $Out\logs, the result lines in $Out\summary.txt;
@@ -37,8 +37,7 @@ param(
     [string]$Old = "upd\old",
     [string]$Site = "upd\site",
     [string]$Apps = "brick slate frame etch",
-    [string]$Out = "out\win-update",
-    [switch]$RequireNotice
+    [string]$Out = "out\win-update"
 )
 $ErrorActionPreference = "Continue"
 $root = (Resolve-Path "$PSScriptRoot\..").Path
@@ -408,11 +407,9 @@ foreach ($app in $Apps -split '\s+' | Where-Object { $_ -and $setups.ContainsKey
 
     # 7. The next start reports it, and its exit clears the installed Setup.exe.
     $run = Start-App $exe "$app-7-next" $url
-    $notice = Wait-Log $run.err "update: Updated to $name $([regex]::Escape($new))" 20
-    if ($run.h) { Start-Sleep -Seconds 2; Shot-Window $run.h "$app-7-updated" }
-    if ($notice) { Pass "${app}: the next start says '$(Log-Line $run.err 'Updated to')' (screenshot $app-7-updated)" }
-    elseif ($RequireNotice) { Fail "${app}: the next start doesn't say 'update: Updated to $name $new'" }
-    else { Note "note ${app}: no notice on stderr yet (UPD-3 shows it); the window started: $([bool]$run.h)" }
+    $notice = Wait-Log $run.err "update: Updated to $name $([regex]::Escape($new))" 30
+    if ($run.h) { Start-Sleep -Seconds 1; Shot-Window $run.h "$app-7-updated" }
+    Check $notice "${app}: the next start says '$(Log-Line $run.err 'Updated to')' (its window: $app-7-updated.png)"
     $quit = Quit $run
     Check ($run.h -and $quit -and -not (Staged $updates) -and (Exes $updates).Count -eq 0) "${app}: $name $new ran and quit; its exit removed the installed Setup.exe and its record (left in updates: $(@(Get-ChildItem -Name $updates -ErrorAction SilentlyContinue) -join ', '))"
 }
