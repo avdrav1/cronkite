@@ -623,10 +623,20 @@ function Check-Gone([string]$app, [string]$tag, $before) {
     Check (-not (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\dev.cronkite.${name}_is1")) "${tag}: Settings > Apps no longer lists it"
     $after = Snapshot "$tag-after"
     $added = Added $before.reg $after.reg
-    # Windows' own records (Software\Microsoft, Classes\Local Settings) and those of other
+    # Windows' own records (Software\Microsoft, Classes\Local Settings), those of other
     # programs on the runner that run on their own schedule (Firefox's default browser
-    # agent, Software\Mozilla) aren't the app's.
-    function Theirs($key) { $key -like "HKEY_CURRENT_USER\Software\Microsoft\*" -or $key -like "HKEY_CURRENT_USER\Software\Classes\Local Settings*" -or $key -like "HKEY_CURRENT_USER\Software\Mozilla*" }
+    # agent, Software\Mozilla), and the Store packages Windows registers for the user in the
+    # background (Feedback Hub, WSL: Classes\AppX*, Classes\Extensions\ContractId, their
+    # protocols and extensions, RegisteredApplications\PackagedApps) aren't the app's. Under
+    # Classes, the app writes only its types, its Cronkite.* ProgIDs, and Applications\.
+    function Theirs($key) {
+        $classes = "HKEY_CURRENT_USER\Software\Classes\"
+        if ($key -like "HKEY_CURRENT_USER\Software\Microsoft\*" -or $key -like "${classes}Local Settings*" -or $key -like "HKEY_CURRENT_USER\Software\Mozilla*" -or $key -like "HKEY_CURRENT_USER\Software\RegisteredApplications\PackagedApps*") { return $true }
+        if (-not $key.StartsWith($classes, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+        $top = $key.Substring($classes.Length).Split('\')[0]
+        if ($key -match '\\OpenWithProgids\\\\AppX') { return $true }
+        -not ($Types[$app] -contains $top -or $top -like "Cronkite.*" -or $top -ieq "Applications")
+    }
     $windows = @($added | Where-Object { Theirs $_ })
     $left = @($added | Where-Object { $windows -notcontains $_ })
     Set-Content -Encoding utf8 "$logs\$tag-registry-windows.txt" $windows
