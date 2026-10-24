@@ -1,0 +1,6 @@
+﻿Downloading Slate 0.6.0 for Windows
+Installed Slate 0.6.0
+  C:\Users\runneradmin\AppData\Local\Programs\Slate: start it from the Start menu
+  Word documents, Markdown, and plain text (.docx .md .markdown .txt) list it under Open with;
+  to make it a type's default, right-click a file > Open with > Choose another app > Slate > Always
+

@@ -1,0 +1,8 @@
+2026-10-24T13:10:32.702050Z  INFO frame: application starting
+Frame starting...
+2026-10-24T13:10:32.706564Z  INFO frame: running from the bundle C:\Users\runneradmin\AppData\Local\Programs\Frame
+2026-10-24T13:10:32.768013Z  INFO suite_ui::fonts::fc: fonts: added C:\Users\runneradmin\AppData\Local\Programs\Frame\fonts to fontconfig in 60 ms
+
+(frame.exe:1272): GLib-GIO-WARNING **: 13:10:32.791: win32 session dbus binary not found
+2026-10-24T13:10:32.913884Z  INFO suite_ui::appearance: appearance: light
+update: Updated to Frame 0.4.1

@@ -1,0 +1,16 @@
+$ tell application "System Events" to set frontmost of (first process whose unix id is 1805) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 1946) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 2231) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 2319) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 2522) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 2721) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 2847) to true
+$ tell application "System Events" to keystroke "q" using command down
+$ tell application "System Events" to set frontmost of (first process whose unix id is 3064) to true
+$ tell application "System Events" to keystroke "q" using command down

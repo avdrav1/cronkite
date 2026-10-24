@@ -1,0 +1,47 @@
+UPD-7 in the wild, macOS 14.8.9 (arm64), 2026-10-24T13:09Z, EXPECT_UPDATE=1
+ok   no Homebrew at /opt/homebrew
+== Brick: FROM 0.6.0, live latest 0.6.1
+ok   brick: https://brick.cronkite.cc/install.sh installed the live Brick 0.6.0 in /Users/runner/Applications/Brick.app
+brick: --version before: brick 0.6.0
+ok   brick: --version is 0.6.0
+ok   brick: the running 0.6.0 downloaded and staged the live 0.6.1: update: update: Brick 0.6.1 downloaded for the next start|
+ok   brick: ⌘Q swapped 0.6.1 in: update: update: Brick 0.6.1 downloaded for the next start|update: Brick 0.6.1 swapped in at /Users/runner/Applications/Brick.app|
+brick: --version after: brick 0.6.1
+ok   brick: after quitting, --version is 0.6.1
+ok   brick: the swapped bundle's signature verifies (codesign --verify --deep --strict)
+ok   brick: the swapped bundle carries no quarantine
+ok   brick: the next start says "Updated to Brick 0.6.1" (record consumed)
+== Slate: FROM 0.6.0, live latest 0.6.1
+ok   slate: https://slate.cronkite.cc/install.sh installed the live Slate 0.6.0 in /Users/runner/Applications/Slate.app
+slate: --version before: slate 0.6.0
+ok   slate: --version is 0.6.0
+ok   slate: the running 0.6.0 downloaded and staged the live 0.6.1: update: update: Slate 0.6.1 downloaded for the next start|
+ok   slate: ⌘Q swapped 0.6.1 in: update: update: Slate 0.6.1 downloaded for the next start|update: Slate 0.6.1 swapped in at /Users/runner/Applications/Slate.app|
+slate: --version after: slate 0.6.1
+ok   slate: after quitting, --version is 0.6.1
+ok   slate: the swapped bundle's signature verifies (codesign --verify --deep --strict)
+ok   slate: the swapped bundle carries no quarantine
+ok   slate: the next start says "Updated to Slate 0.6.1" (record consumed)
+== Frame: FROM 0.4.0, live latest 0.4.1
+ok   frame: https://frame.cronkite.cc/install.sh installed the live Frame 0.4.0 in /Users/runner/Applications/Frame.app
+frame: --version before: frame 0.4.0
+ok   frame: --version is 0.4.0
+ok   frame: the running 0.4.0 downloaded and staged the live 0.4.1: update: update: Frame 0.4.1 downloaded for the next start|
+ok   frame: ⌘Q swapped 0.4.1 in: update: update: Frame 0.4.1 downloaded for the next start|update: Frame 0.4.1 swapped in at /Users/runner/Applications/Frame.app|
+frame: --version after: frame 0.4.1
+ok   frame: after quitting, --version is 0.4.1
+ok   frame: the swapped bundle's signature verifies (codesign --verify --deep --strict)
+ok   frame: the swapped bundle carries no quarantine
+ok   frame: the next start says "Updated to Frame 0.4.1" (record consumed)
+== Etch: FROM 0.5.0, live latest 0.5.1
+ok   etch: https://etch.cronkite.cc/install.sh installed the live Etch 0.5.0 in /Users/runner/Applications/Etch.app
+etch: --version before: etch 0.5.0
+ok   etch: --version is 0.5.0
+ok   etch: the running 0.5.0 downloaded and staged the live 0.5.1: update: update: Etch 0.5.1 downloaded for the next start|
+ok   etch: ⌘Q swapped 0.5.1 in: update: update: Etch 0.5.1 downloaded for the next start|update: Etch 0.5.1 swapped in at /Users/runner/Applications/Etch.app|
+etch: --version after: etch 0.5.1
+ok   etch: after quitting, --version is 0.5.1
+ok   etch: the swapped bundle's signature verifies (codesign --verify --deep --strict)
+ok   etch: the swapped bundle carries no quarantine
+ok   etch: the next start says "Updated to Etch 0.5.1" (record consumed)
+check_mac_update_live: OK (33 checks)

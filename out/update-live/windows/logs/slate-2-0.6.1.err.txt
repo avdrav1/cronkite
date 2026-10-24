@@ -1,0 +1,8 @@
+2026-10-24T13:10:10.927763Z  INFO slate: application starting
+Slate starting...
+2026-10-24T13:10:10.930145Z  INFO slate: running from the bundle C:\Users\runneradmin\AppData\Local\Programs\Slate
+2026-10-24T13:10:10.973573Z  INFO suite_ui::fonts::fc: fonts: added C:\Users\runneradmin\AppData\Local\Programs\Slate\fonts to fontconfig in 43 ms
+
+(slate.exe:5596): GLib-GIO-WARNING **: 13:10:10.997: win32 session dbus binary not found
+2026-10-24T13:10:11.082069Z  INFO suite_ui::appearance: appearance: light
+update: Updated to Slate 0.6.1

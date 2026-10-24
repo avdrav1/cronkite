@@ -1,0 +1,6 @@
+﻿Downloading Etch 0.5.0 for Windows
+Installed Etch 0.5.0
+  C:\Users\runneradmin\AppData\Local\Programs\Etch: start it from the Start menu
+  PNG, JPEG, and BMP images (.png .jpg .jpeg .bmp) list it under Open with; to make it a type's
+  default, right-click a file > Open with > Choose another app > Etch > Always
+

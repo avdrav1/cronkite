@@ -1,0 +1,7 @@
+2026-10-24T13:09:44.084535Z  INFO slate: application starting
+Slate starting...
+2026-10-24T13:09:44.086457Z  INFO slate: running from the bundle /Users/runner/Applications/Slate.app/Contents/Resources
+2026-10-24T13:09:44.882750Z  INFO suite_ui::fonts::fc: fonts: added /Users/runner/Applications/Slate.app/Contents/Resources/fonts to fontconfig in 795 ms
+2026-10-24T13:09:45.018044Z  INFO suite_ui::appearance: appearance: light
+2026-10-24T13:09:46.346471Z  INFO suite_update: update: Slate 0.6.1 downloaded for the next start
+2026-10-24T13:09:49.984891Z  INFO suite_update::apply::macos: update: Slate 0.6.1 swapped in at /Users/runner/Applications/Slate.app

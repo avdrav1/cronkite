@@ -1,0 +1,5 @@
+Downloading Brick 0.6.0 for macOS
+Installed Brick 0.6.0
+  /Users/runner/Applications/Brick.app: open it from Launchpad, Spotlight, or Finder
+  CSV, TSV, and Excel files (.xlsx, .xlsm) list it under Open With; to make it their default,
+  select one in Finder, then File > Get Info > Open with: Brick > Change All

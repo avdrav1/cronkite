@@ -1,0 +1,6 @@
+﻿Downloading Brick 0.6.0 for Windows
+Installed Brick 0.6.0
+  C:\Users\runneradmin\AppData\Local\Programs\Brick: start it from the Start menu
+  CSV, TSV, and Excel workbooks (.csv .tsv .xlsx .xlsm) list it under Open with; to make it a
+  type's default, right-click a file > Open with > Choose another app > Brick > Always
+

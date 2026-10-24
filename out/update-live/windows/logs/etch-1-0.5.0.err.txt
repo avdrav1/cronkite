@@ -1,0 +1,10 @@
+2026-10-24T13:10:44.244694Z  INFO etch: application starting
+Etch starting...
+2026-10-24T13:10:44.247870Z  INFO etch: running from the bundle C:\Users\runneradmin\AppData\Local\Programs\Etch
+2026-10-24T13:10:44.249075Z  WARN suite_ui::fonts::fc: no bundled fonts folder: Word and PowerPoint fonts fall back to similar ones
+
+(etch.exe:2716): GLib-GIO-WARNING **: 13:10:44.276: win32 session dbus binary not found
+2026-10-24T13:10:44.480990Z  INFO suite_ui::appearance: appearance: light
+2026-10-24T13:10:44.976692Z  INFO etch::window: opened D:\a\cronkite\cronkite\out\update-live\windows\files\wide.png: 64×32 in 1 ms
+2026-10-24T13:10:46.081944Z  INFO suite_update: update: Etch 0.5.1 downloaded for the next start
+2026-10-24T13:10:47.185280Z  INFO suite_update::apply::windows: update: installing Etch 0.5.1 (Setup.exe, process 6764, log C:\Users\runneradmin\AppData\Local\Cronkite\Etch\updates\setup.log)

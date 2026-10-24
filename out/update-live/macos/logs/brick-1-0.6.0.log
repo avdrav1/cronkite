@@ -1,0 +1,7 @@
+2026-10-24T13:09:27.835669Z  INFO brick: application starting
+Brick starting...
+2026-10-24T13:09:27.836735Z  INFO brick: running from the bundle /Users/runner/Applications/Brick.app/Contents/Resources
+2026-10-24T13:09:29.619718Z  INFO suite_ui::fonts::fc: fonts: added /Users/runner/Applications/Brick.app/Contents/Resources/fonts to fontconfig in 1782 ms
+2026-10-24T13:09:29.847926Z  INFO suite_ui::appearance: appearance: light
+2026-10-24T13:09:30.870173Z  INFO suite_update: update: Brick 0.6.1 downloaded for the next start
+2026-10-24T13:09:35.793472Z  INFO suite_update::apply::macos: update: Brick 0.6.1 swapped in at /Users/runner/Applications/Brick.app
