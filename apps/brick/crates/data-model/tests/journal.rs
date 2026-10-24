@@ -343,7 +343,10 @@ fn a_bit_flipped_anywhere_is_refused_without_allocating_what_it_claims() {
             let mut flipped = bytes.clone();
             flipped[i] ^= 0x40;
             assert!(
-                matches!(read_book_journal(&flipped[..]), Err(JournalError::Corrupt(_))),
+                matches!(
+                    read_book_journal(&flipped[..]),
+                    Err(JournalError::Corrupt(_))
+                ),
                 "byte {i} of {}",
                 bytes.len()
             );
