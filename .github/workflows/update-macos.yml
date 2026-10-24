@@ -37,6 +37,11 @@ jobs:
         with: { path: target/mac-cairo, key: "mac-cairo-${{ hashFiles('scripts/mac_cairo.sh') }}" }
       - name: cairo without lzo
         run: scripts/mac_cairo.sh target/mac-cairo
+      # The swap on a real ad-hoc-signed bundle (codesign, xattr), alone: it starts other
+      # programs, which the other suite-update tests mustn't run beside.
+      - name: suite-update's macOS swap test
+        if: matrix.app == 'brick'
+        run: cargo test -p suite-update apply::macos -- --include-ignored
       - name: Build, bundle, and sign four releases (test key)
         run: scripts/check_mac_update.sh build "$RUNNER_TEMP/update" ${{ matrix.app }}
       - name: Move Homebrew away

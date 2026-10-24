@@ -122,9 +122,10 @@ mod tests {
         out
     }
 
-    /// A real ad-hoc-signed bundle, as `scripts/mac_bundle.sh` makes them (a Mach-O
-    /// executable, `Contents/Frameworks`, resources), at `version`, in `dir/name.app`.
-    fn signed_bundle(dir: &Path, version: &str) -> PathBuf {
+    /// A bundle as `scripts/mac_bundle.sh` makes them (a Mach-O executable: this test
+    /// program, arm64 like the apps; `Contents/Frameworks`; resources) at `version`, in
+    /// `dir/Brick.app`; ad-hoc signed when `sign`.
+    fn bundle(dir: &Path, version: &str, sign: bool) -> PathBuf {
         let app = dir.join("Brick.app");
         let c = app.join("Contents");
         fs::create_dir_all(c.join("MacOS")).unwrap();
@@ -145,18 +146,20 @@ mod tests {
             ),
         )
         .unwrap();
-        fs::copy("/usr/bin/true", c.join("MacOS/brick")).unwrap();
+        fs::copy(std::env::current_exe().unwrap(), c.join("MacOS/brick")).unwrap();
         fs::write(c.join("Resources/version.txt"), version).unwrap();
-        run(Command::new("codesign")
-            .args(["--force", "-s", "-"])
-            .arg(&app));
+        if sign {
+            run(Command::new("codesign")
+                .args(["--force", "-s", "-"])
+                .arg(&app));
+        }
         app
     }
 
     #[test]
     fn the_running_bundle_is_found_from_its_executable() {
         let dir = folder("found");
-        let app = signed_bundle(&dir.join("Applications"), "1.0.0");
+        let app = bundle(&dir.join("Applications"), "1.0.0", false);
         let exe = app.join("Contents/MacOS/brick");
         assert_eq!(
             suite_platform::bundle::install_root(&exe).as_deref(),
@@ -165,16 +168,21 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    // Ignored by default: it starts other programs, and a child started while another
+    // test's thread drops the updates lock can hold that lock's open file (a `flock`)
+    // until it execs, making the other test's next check find it busy. update-macos.yml
+    // runs it alone.
     #[test]
+    #[ignore = "starts codesign and tar; run alone: cargo test -p suite-update apply::macos -- --ignored"]
     fn a_swapped_in_signed_bundle_verifies_and_carries_no_quarantine() {
         let dir = folder("signed");
         let apps = dir.join("Applications");
         let updates = dir.join("updates");
-        let app = signed_bundle(&apps, "1.0.0");
+        let app = bundle(&apps, "1.0.0", true);
         // The release, made as mac_bundle.sh makes it: tar of the signed bundle alone.
         let build = dir.join("build");
         fs::create_dir_all(&build).unwrap();
-        signed_bundle(&build, "1.0.1");
+        bundle(&build, "1.0.1", true);
         let tarball = dir.join("release.tar.gz");
         run(Command::new("tar")
             .env("COPYFILE_DISABLE", "1")
@@ -204,8 +212,8 @@ mod tests {
             "quarantined: {}",
             String::from_utf8_lossy(&quarantine.stdout)
         );
-        // It runs.
-        run(&mut Command::new(app.join("Contents/MacOS/brick")));
+        // It runs (this test program, listing its tests).
+        run(Command::new(app.join("Contents/MacOS/brick")).arg("--list"));
         let _ = fs::remove_dir_all(&dir);
     }
 }
