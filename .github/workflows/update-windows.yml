@@ -14,6 +14,9 @@ on:
       apps:
         description: "Apps to check (brick slate frame etch)"
         default: "brick slate frame etch"
+      builds:
+        description: "Reuse this run's update-windows-builds instead of building (a run id)"
+        default: ""
   push:
     branches: ["**"]
     paths:
@@ -23,6 +26,7 @@ on:
       - packaging/windows/setup.iss
 jobs:
   bundle:
+    if: ${{ !inputs.builds }}
     runs-on: windows-latest
     timeout-minutes: 150
     defaults: { run: { shell: "msys2 {0}" } }
@@ -86,8 +90,10 @@ jobs:
           set -euo pipefail
           key=$(cygpath -w "$PWD/crates/suite-update/test-key/test.key")
           tmp=$(mktemp -d)
+          # The repository's versions, put back before each app (MSYS2 has no git).
+          tar -cf "$tmp/versions.tar" Cargo.toml Cargo.lock apps/*/Cargo.toml
           for a in ${{ steps.apps.outputs.apps }}; do
-            git checkout -- Cargo.toml Cargo.lock apps/*/Cargo.toml
+            tar -xf "$tmp/versions.tar"
             old=$(python3 scripts/win_app.py version "$a")
             cargo build --release --locked -p "$a" --features suite-update/test-key
             scripts/win_bundle.sh "$a" target/release upd/old-bundles
@@ -124,25 +130,31 @@ jobs:
               none none "$(cygpath -w "$PWD/upd/site/$a/releases/v$new/$setup")" "$(cygpath -w "$PWD/upd/site/$a/latest.json")"
             cat "upd/site/$a/latest.json" "upd/site/$a/latest.json.sig"
           done
-          git checkout -- Cargo.toml Cargo.lock apps/*/Cargo.toml
+          tar -xf "$tmp/versions.tar"
           ls -lR upd/old upd/site
       - uses: actions/upload-artifact@v4
         with: { name: update-windows-builds, path: "upd/old\nupd/site", if-no-files-found: error, compression-level: 0 }
   verify:
     # A fresh runner with MSYS2 moved away and a PATH of Windows' own folders.
     needs: bundle
+    if: ${{ !cancelled() && (needs.bundle.result == 'success' || (needs.bundle.result == 'skipped' && inputs.builds)) }}
     runs-on: windows-latest
     timeout-minutes: 90
+    permissions: { contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: { name: update-windows-builds, path: upd }
+        with:
+          name: update-windows-builds
+          path: upd
+          run-id: ${{ inputs.builds || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Move MSYS2 away
         shell: pwsh
         run: if (Test-Path C:\msys64) { Rename-Item C:\msys64 C:\msys64-away }
       - name: Install the old version, update it by quitting, refuse tampered releases
         shell: powershell
-        run: '& .\scripts\check_win_update.ps1 -Old upd\old -Site upd\site -Apps "${{ needs.bundle.outputs.apps }}"'
+        run: '& .\scripts\check_win_update.ps1 -Old upd\old -Site upd\site -Apps "${{ needs.bundle.outputs.apps || inputs.apps }}"'
       - name: MSYS2 back
         if: always()
         shell: pwsh
