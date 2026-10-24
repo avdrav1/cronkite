@@ -114,6 +114,8 @@ fn main() -> glib::ExitCode {
     eprintln!("{}", suite_ui::startup_message(APP));
     // This run's part in applying updates (ADR 0012); before the bundle's environment.
     let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
+    // "Updated to Slate X.Y.Z" in the first window, at the first start after an update.
+    suite_ui::notice::queue(suite_update::notice(APP, env!("CARGO_PKG_VERSION")));
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
         Ok(Some(res)) => tracing::info!("running from the bundle {}", res.display()),
@@ -180,7 +182,11 @@ fn main() -> glib::ExitCode {
             })
             .build();
         app.add_action_entries([new, open, close, quit, text_width]);
-        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"));
+        let update = suite_ui::chrome::AutoUpdate {
+            on: suite_update::automatic(APP),
+            keep: |on| suite_update::set_automatic(APP, on),
+        };
+        suite_ui::chrome::install(app, APP, env!("CARGO_PKG_VERSION"), update);
         if suite_ui::chrome::MENU_BAR {
             app.set_menubar(Some(&MENUS.with(Menus::bar)));
         }
@@ -278,7 +284,8 @@ impl Menus {
         let view = gio::Menu::new();
         view.append_submenu(Some("Text Width"), &widths);
         let (edit, format) = (edit_menu(), format_menu());
-        // The header bar's menu (Linux): every menu a section, then Quit.
+        // The header bar's menu (Linux): every menu a section, then Update Automatically
+        // and About Slate, then Quit.
         let quit = gio::Menu::new();
         quit.append(Some("Quit"), Some("app.quit"));
         let primary = gio::Menu::new();
@@ -286,6 +293,7 @@ impl Menus {
         primary.append_section(Some("View"), &view);
         primary.append_section(Some("Edit"), &edit);
         primary.append_section(Some("Format"), &format);
+        primary.append_section(None, &suite_ui::chrome::app_section(APP));
         primary.append_section(None, &quit);
         Menus {
             file,
@@ -321,14 +329,9 @@ fn header(title: &str) -> gtk::HeaderBar {
     open.update_property(&[gtk::accessible::Property::Label("Open")]);
     header.pack_start(&open);
     // The primary menu: F10 opens it.
-    let button = gtk::MenuButton::builder()
-        .icon_name("open-menu-symbolic")
-        .menu_model(&MENUS.with(|m| m.primary.clone()))
-        .tooltip_text("Menu")
-        .primary(true)
-        .build();
-    button.update_property(&[gtk::accessible::Property::Label("Main Menu")]);
-    header.pack_end(&button);
+    header.pack_end(&suite_ui::chrome::main_menu(
+        &MENUS.with(|m| m.primary.clone()),
+    ));
     let label = gtk::Label::new(Some(title));
     label.add_css_class("title");
     header.set_title_widget(Some(&label));
@@ -510,7 +513,7 @@ fn start_window(app: &gtk::Application) {
         content.append(&section);
         first
     });
-    window.set_child(Some(&content));
+    window.set_child(Some(&suite_ui::notice::host(&content)));
     accept_drops(app, &window);
     window.present();
     if let Some(first) = restore {
@@ -676,7 +679,7 @@ fn open_window(
     content.append(&stack);
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     content.append(&status);
-    window.set_child(Some(&content));
+    window.set_child(Some(&suite_ui::notice::host(&content)));
     accept_drops(app, &window);
     if let Some(path) = &path {
         OPEN.with_borrow_mut(|open| open.push((path.clone(), window.downgrade())));
