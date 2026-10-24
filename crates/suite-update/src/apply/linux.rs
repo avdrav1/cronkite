@@ -45,7 +45,11 @@ const DESKTOP_LIMIT: u64 = 1 << 20;
 
 pub(super) fn after_check(app: AppKind, updates: &Path, staged: &Staged) {
     match LinuxHome::current() {
-        Some(home) => apply_in(app, updates, staged, &home),
+        Some(home) => {
+            if apply_in(app, updates, staged, &home) {
+                refresh_caches(&home);
+            }
+        }
         None => tracing::warn!(
             "update: no home folder to install {app} {} in",
             staged.version
@@ -53,19 +57,27 @@ pub(super) fn after_check(app: AppKind, updates: &Path, staged: &Staged) {
     }
 }
 
-/// [`after_check`] for the install under `home`.
-pub(crate) fn apply_in(app: AppKind, updates: &Path, staged: &Staged, home: &LinuxHome) {
+/// [`after_check`] for the install under `home`, without refreshing the caches (tests
+/// spawn no processes: a child forked while another test holds an updates lock keeps that
+/// lock until it execs). Whether the release was installed now.
+pub(crate) fn apply_in(app: AppKind, updates: &Path, staged: &Staged, home: &LinuxHome) -> bool {
     let v = &staged.version;
     match apply(app, home, staged) {
         Ok(Applied::Installed) => {
-            refresh_caches(home);
             if let Err(e) = crate::session::record_applied(updates, v) {
                 tracing::warn!("update: recording {app} {v} as applied: {e}");
             }
             tracing::info!("update: {app} {v} installed for the next start");
+            true
         }
-        Ok(Applied::Already) => tracing::debug!("update: {app} {v} is installed already"),
-        Err(e) => tracing::warn!("update: {app} {v} not installed: {e}"),
+        Ok(Applied::Already) => {
+            tracing::debug!("update: {app} {v} is installed already");
+            false
+        }
+        Err(e) => {
+            tracing::warn!("update: {app} {v} not installed: {e}");
+            false
+        }
     }
 }
 

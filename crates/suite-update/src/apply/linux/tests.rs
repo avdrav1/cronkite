@@ -175,7 +175,7 @@ fn a_staged_release_replaces_the_installed_files_and_never_mimeapps() {
     let mut running = File::open(h.path(".local/bin/brick")).unwrap();
     let staged = h.stage(&tarball(&release()), None);
 
-    apply_in(APP, &h.updates, &staged, &h.home);
+    assert!(apply_in(APP, &h.updates, &staged, &h.home));
 
     assert_eq!(h.read(".local/bin/brick"), NEW_BIN);
     let meta = fs::metadata(h.path(".local/bin/brick")).unwrap();
@@ -227,7 +227,7 @@ fn a_staged_release_replaces_the_installed_files_and_never_mimeapps() {
     let before = h.files();
     let inode = fs::metadata(h.path(".local/bin/brick")).unwrap().ino();
     assert_eq!(apply(APP, &h.home, &staged).unwrap(), Applied::Already);
-    apply_in(APP, &h.updates, &staged, &h.home);
+    assert!(!apply_in(APP, &h.updates, &staged, &h.home));
     assert_eq!(h.files(), before);
     assert_eq!(
         fs::metadata(h.path(".local/bin/brick")).unwrap().ino(),
@@ -248,7 +248,7 @@ fn a_tampered_staged_file_leaves_the_install_as_it_was() {
 
     let e = apply(APP, &h.home, &staged).unwrap_err();
     assert!(e.to_string().contains("sha256"), "{e}");
-    apply_in(APP, &h.updates, &staged, &h.home);
+    assert!(!apply_in(APP, &h.updates, &staged, &h.home));
     assert_eq!(h.files(), before);
     assert!(!h.updates.join("applied").exists());
 }
