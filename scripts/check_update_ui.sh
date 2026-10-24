@@ -157,7 +157,7 @@ for spec in brick:Brick slate:Slate frame:Frame etch:Etch; do
   app=${spec%%:*}; name=${spec#*:}
   v=$(section "$app 1" | sed -n "s/^version: //p")
   [ -n "$v" ] || { echo "FAIL $app: no version (did it run?)"; fail=1; continue; }
-  check "$app 1: the first start after an update shows “Updated to $name $v”" "$app 1" "^notice: Updated to $name ${v//./\\.}$"
+  check "$app 1: the first start after an update shows “Updated to $name ${v}”" "$app 1" "^notice: Updated to $name ${v//./\\.}$"
   check "$app 1: ... logs it on stderr" "$app 1" "^log: update: Updated to $name ${v//./\\.}$"
   check "$app 1: ... and the record of the update is gone" "$app 1" "^record: gone$"
   case $app in

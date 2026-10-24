@@ -90,10 +90,10 @@ update_click() {
     sleep 1
     got=$(cat "$settings" 2>/dev/null)
     if [[ $got == "automatic=$want" ]]; then pass "$app: a click on Update Automatically keeps automatic=$want in $settings"
-    else fail "$app: after a click $settings holds “$got”, not automatic=$want"; fi
+    else fail "$app: after a click $settings holds “${got}”, not automatic=$want"; fi
     got=$(update_mark "$app")
-    if [[ $got == "$mark" ]]; then pass "$app: Update Automatically now shows mark “$mark”"
-    else fail "$app: Update Automatically shows mark “$got”, not “$mark”"; fi
+    if [[ $got == "$mark" ]]; then pass "$app: Update Automatically now shows mark “${mark}”"
+    else fail "$app: Update Automatically shows mark “${got}”, not “${mark}”"; fi
 }
 
 # Check app $1, started on file $2; $3: its menu bar's menus after the app menu; $4: the
@@ -113,8 +113,8 @@ check() {
     start "$app" "$file" || return
     shot "$app-1-window"
     if grep -qx "update: Updated to $name $version" "$logs/$app.log"; then
-        pass "$app: the first start after an update says “Updated to $name $version” (shots/$app-1-window.png)"
-    else fail "$app: no “update: Updated to $name $version” in logs/$app.log"; fi
+        pass "$app: the first start after an update says “Updated to $name ${version}” (shots/$app-1-window.png)"
+    else fail "$app: no “update: Updated to $name ${version}” in logs/$app.log"; fi
     if [[ -e $cache/applied ]]; then fail "$app: the applied record is still there"
     else pass "$app: the applied record is gone"; fi
 
