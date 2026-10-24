@@ -15,9 +15,8 @@
 #      new tarball's, byte for byte (the new release's carry a marker the old one's don't),
 #      updates/applied names NEW, and `xdg-mime query default` for its types and
 #      text/plain, and mimeapps.list's bytes, are as before;
-#   4. the next start runs NEW, shows the notice (NOTICE=line: logs `update: Updated to
-#      <App> NEW` and consumes the record, once UPD-3 shows it; NOTICE=record, until then:
-#      updates/applied still names NEW), and installs nothing again;
+#   4. the next start runs NEW, shows the notice (logs `update: Updated to <App> NEW`, UPD-3)
+#      and consumes updates/applied, and installs nothing again;
 #   5. reinstalled OLD, a release whose tarball's bytes changed under a correctly signed
 #      manifest is refused ("the download's sha256 is …"): nothing staged, OLD still
 #      installed and running, defaults as before;
@@ -39,7 +38,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 repo=$PWD
 APPS=${APPS:-brick slate frame etch}
-NOTICE=${NOTICE:-record}
 TARGET=x86_64-unknown-linux-gnu
 IMAGE=brick-build:ubuntu-24.04
 work=target/check-update
@@ -127,7 +125,7 @@ EOF
   cp "sites/$a/install.sh" "$site/$a/install.sh"
 done
 {
-  echo "APPS='$APPS'"; echo "NOTICE=$NOTICE"
+  echo "APPS='$APPS'"
   for a in $APPS; do echo "OLD_$a=${OLD[$a]}"; echo "NEW_$a=${NEW[$a]}"; done
 } > "$site/versions"
 cat > "$site/run.sh" <<'EOF'
@@ -232,12 +230,8 @@ for app in $APPS; do
 
   start new "/tmp/$app-next.log"
   check "the next start runs $new" running
-  if [ "$NOTICE" = line ]; then
-    check "the next start shows 'Updated to $App $new'" saw "update: Updated to $App $new"
-    check "the notice's record is consumed" test ! -e ~/.cache/$app/updates/applied
-  else
-    check "the next start finds updates/applied naming $new for its notice" applied_is "$new"
-  fi
+  check "the next start shows 'Updated to $App $new'" saw "update: Updated to $App $new"
+  check "the notice's record is consumed" test ! -e ~/.cache/$app/updates/applied
   check "the next start installs nothing again" sh -c "! grep -q 'installed for the next start' '$log'"
   quit
   check "default apps unchanged after the next start" same "$before" "$(defaults)"
