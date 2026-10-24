@@ -1,0 +1,56 @@
+# The apps updating themselves on macOS (UPD-5, ADR 0012): per app, four releases built with
+# the update checks' test key trusted (versions 99.0.1 to 99.0.4) and bundled as the release
+# is (scripts/mac_bundle.sh), then, with Homebrew moved away, the oldest installed by its
+# install.sh and updated from a local server: a killed instance's staged update applied at
+# the next start, a second instance deferring the swap, quit then start, tampered releases
+# refused (scripts/check_mac_update.sh). The releases are signed with the test key only.
+name: update-macos
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths:
+      - .github/workflows/update-macos.yml
+      - crates/suite-update/**
+      - scripts/check_mac_update.sh
+# Explicitly bash: GitHub then runs steps with -eo pipefail.
+defaults: { run: { shell: bash } }
+jobs:
+  update:
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [brick, slate, frame, etch]
+    runs-on: macos-14
+    timeout-minutes: 75
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { key: "${{ matrix.app }}" }
+      - run: brew install gtk4 pkgconf adwaita-icon-theme librsvg dylibbundler meson ninja openssl@3
+      # cairo without lzo (scripts/mac_cairo.sh), as release-macos.yml builds it.
+      - uses: actions/cache@v4
+        with: { path: target/mac-cairo, key: "mac-cairo-${{ hashFiles('scripts/mac_cairo.sh') }}" }
+      - name: cairo without lzo
+        run: scripts/mac_cairo.sh target/mac-cairo
+      # The swap on a real ad-hoc-signed bundle (codesign, xattr), alone: it starts other
+      # programs, which the other suite-update tests mustn't run beside.
+      - name: suite-update's macOS swap test
+        if: matrix.app == 'brick'
+        run: cargo test -p suite-update apply::macos -- --include-ignored
+      - name: Build, bundle, and sign four releases (test key)
+        run: scripts/check_mac_update.sh build "$RUNNER_TEMP/update" ${{ matrix.app }}
+      - name: Move Homebrew away
+        run: sudo mv /opt/homebrew /opt/homebrew-away
+      - name: Install the oldest and update it
+        run: scripts/check_mac_update.sh check "$RUNNER_TEMP/update" ${{ matrix.app }}
+      - name: Homebrew back
+        if: always()
+        run: if [ -d /opt/homebrew-away ]; then sudo mv /opt/homebrew-away /opt/homebrew; fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "mac-update-${{ matrix.app }}", path: "out/mac-update/shots\nout/mac-update/logs\nout/mac-update/summary.txt", if-no-files-found: warn }

@@ -10,6 +10,8 @@ use std::path::Path;
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(any(target_os = "macos", all(test, unix)))]
+mod mac_bundle;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(windows)]
