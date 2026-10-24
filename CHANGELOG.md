@@ -2,6 +2,30 @@
 
 Releases are added by the ship-it skill.
 
+## Etch v0.5.1 (2026-10-24)
+
+The first Etch release that arrives by itself: a copy of Etch 0.5.0 downloads it at its next start, installs it (on a Mac and on Windows once the last Etch window is closed), and says "Updated to Etch 0.5.1" once. Nothing else changed since 0.5.0.
+
+- UPD-7: Ship the updater, then update it in the wild
+
+## Frame v0.4.1 (2026-10-24)
+
+The first Frame release that arrives by itself: a copy of Frame 0.4.0 downloads it at its next start, installs it (on a Mac and on Windows once the last Frame window is closed), and says "Updated to Frame 0.4.1" once. Nothing else changed since 0.4.0.
+
+- UPD-7: Ship the updater, then update it in the wild
+
+## Slate v0.6.1 (2026-10-24)
+
+The first Slate release that arrives by itself: a copy of Slate 0.6.0 downloads it at its next start, installs it (on a Mac and on Windows once the last Slate window is closed), and says "Updated to Slate 0.6.1" once. Nothing else changed since 0.6.0.
+
+- UPD-7: Ship the updater, then update it in the wild
+
+## v0.6.1 (2026-10-24)
+
+The first Brick release that arrives by itself: a copy of Brick 0.6.0 downloads it at its next start, installs it (on a Mac and on Windows once the last Brick window is closed), and says "Updated to Brick 0.6.1" once. Nothing else changed since 0.6.0.
+
+- UPD-7: Ship the updater, then update it in the wild
+
 ## Etch v0.5.0 (2026-10-24)
 
 Etch now updates itself. When it starts, it checks for a newer release, downloads it in the background, and runs it from the next start (on Linux the new version is installed at once; on a Mac and on Windows when the last Etch window is closed), then says "Updated to Etch X.Y.Z" once. It only installs releases signed with Cronkite's key, so a tampered download is refused. To turn it off, uncheck Update Automatically (Help on Linux, the Etch menu on a Mac, Help on Windows), or set `CRONKITE_NO_UPDATE=1` for one run. **Copies installed before this release can't update themselves: run the install command once more** (`curl -fsSL https://etch.cronkite.cc/install.sh | sh`, or `irm https://etch.cronkite.cc/install.ps1 | iex` on Windows); from then on updates arrive by themselves.
