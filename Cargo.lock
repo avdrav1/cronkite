@@ -1629,6 +1629,7 @@ dependencies = [
  "tar",
  "tracing",
  "ureq",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

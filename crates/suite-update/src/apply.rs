@@ -12,7 +12,8 @@ use std::path::Path;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(windows)]
+// Its decisions are tested on every platform; starting Setup is Windows' alone.
+#[cfg(any(windows, test))]
 mod windows;
 
 /// After a check found `staged` in `updates` (just staged, or by an earlier check), on the
