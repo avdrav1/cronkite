@@ -326,7 +326,8 @@ foreach ($app in $Apps -split '\s+' | Where-Object { $_ }) {
         Check $done "${app}: the check of the live latest.json ran to its end (updates\.lock taken, released)"
         $lines = Log-Lines $run.err
         Check (-not $lines) "${app}: it logged no problem: latest.json and its signature verified, nothing newer$(if ($lines) { ': ' + $lines })"
-        $left = @(Get-ChildItem -Name $updates -ErrorAction SilentlyContinue | Where-Object { $_ -ne ".lock" })
+        # Nothing in updates but the check's .lock and the running instances' owner-PID.lock.
+        $left = @(Get-ChildItem -Name -Force $updates -ErrorAction SilentlyContinue | Where-Object { $_ -ne ".lock" -and $_ -notmatch '^owner-\d+\.lock$' })
         Check (-not (Staged $updates) -and $left.Count -eq 0) "${app}: nothing staged: $from is the live latest (updates: $($left -join ', '))"
         if ($run.h) { Shot-Window $run.h "$app-1-$from-up-to-date" }
         $quit = Quit $run

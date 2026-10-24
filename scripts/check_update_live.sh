@@ -143,7 +143,8 @@ finished() {
   until flock -n "$updates/.lock" true; do i=$((i + 1)); [ $i -lt 240 ] || return 1; sleep 0.5; done
 }
 no_update_lines() { ! grep -q "update:" "$log"; }
-nothing_staged() { [ ! -e "$updates/staged" ] && [ -z "$(ls "$updates" 2>/dev/null)" ]; }
+# Nothing in updates/ but the check's .lock and the running instances' owner-PID.lock.
+nothing_staged() { [ -z "$(ls "$updates" 2>/dev/null | grep -v '^owner-[0-9]*\.lock$')" ]; }
 applied_is() { grep -qx "version=$1" "$updates/applied"; }
 notice_shown() { python3 /site/update_ui_helpers.py "$app" text | grep -qx "Updated to $App $1"; }
 shot() { grim "$HOME/shots/$app-$1.png"; }

@@ -173,8 +173,11 @@ check_app() {
     else fail "$app: the check didn't run or didn't end: updates/: $(ls -A "$updates" 2>&1 | tr '\n' ' ')"; fi
     grep -q 'update:' "$log" && fail "$app: logged: $(lines)" ||
       pass "$app: it logged no problem: latest.json and its signature verified, nothing newer"
-    [[ ! -e $updates/staged && -z $(ls "$updates" 2>/dev/null) ]] && pass "$app: nothing staged: $from is the live latest" ||
-      fail "$app: staged: $(ls "$updates" | tr '\n' ' ')"
+    # Nothing in updates/ but the check's .lock and the running instances' owner-PID.lock.
+    local left
+    left=$(ls "$updates" 2>/dev/null | grep -v '^owner-[0-9]*\.lock$')
+    [[ -z $left ]] && pass "$app: nothing staged: $from is the live latest (updates/: $(ls -A "$updates" | tr '\n' ' '))" ||
+      fail "$app: staged: $(tr '\n' ' ' <<<"$left")"
     shot "$app-1-$from-up-to-date"
     quit
     note "$app: --version after: $("$exe" --version 2>&1)"
