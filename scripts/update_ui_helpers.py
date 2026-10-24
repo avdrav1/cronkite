@@ -5,11 +5,13 @@
                                           windows, one a line
     update_ui_helpers.py APP windows      the names of APP's windows, one a line
     update_ui_helpers.py APP press LABEL  activate the button named LABEL
-    update_ui_helpers.py APP item LABEL   the menu item or toggle button showing LABEL:
-                                          "checked" or "unchecked" ("none": no such item)
+    update_ui_helpers.py APP item LABEL   the menu item (check or radio) or toggle button
+                                          showing LABEL: "checked" or "unchecked" ("none":
+                                          no such item)
 
 APP is the program's name ("brick"). A popover menu item has no name of its own: the
-label it's labelled by holds its text. Used by scripts/check_update_ui.sh; needs
+label it's labelled by holds its text. Used by scripts/check_update_ui.sh and
+scripts/check_brick_data_menu.sh; needs
 python-gobject and at-spi2-core, inside the app's D-Bus session.
 """
 
@@ -81,7 +83,12 @@ def main():
     elif cmd == "item":
         for node in walk(root):
             role = node.get_role()
-            items = (Atspi.Role.MENU_ITEM, Atspi.Role.CHECK_MENU_ITEM, Atspi.Role.TOGGLE_BUTTON)
+            items = (
+                Atspi.Role.MENU_ITEM,
+                Atspi.Role.CHECK_MENU_ITEM,
+                Atspi.Role.RADIO_MENU_ITEM,
+                Atspi.Role.TOGGLE_BUTTON,
+            )
             if role in items and label(node) == rest[0]:
                 # A toggle button says it's on as pressed, a check item as checked.
                 states = node.get_state_set()

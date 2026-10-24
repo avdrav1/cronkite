@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# APP-10 acceptance: Brick's "First Row Is Header" is a check item in the Data menu (Linux:
-# the main menu's Data), not a button in the header bar.
+# APP-10 acceptance: Brick's "First Row Is Header" and Delimiter are in the Data menu (Linux:
+# the main menu's Data), not a button and a dropdown in the header bar.
 #
 #   scripts/check_brick_data_menu.sh [BIN_DIR]   (default target/release)
 #
 # In an Arch container under headless sway (1280x720), reading what Brick shows through the
 # accessibility tree (scripts/update_ui_helpers.py), keys through wtype:
-#   1. a CSV whose first row names its columns opens with no "Header row" button, 3 rows;
+#   1. a CSV whose first row names its columns opens with no "Header row" button and no
+#      delimiter dropdown, 3 rows;
 #   2. F10, Data: "First Row Is Header" checked (screenshot);
 #   3. Enter on it: the first row is data, 4 rows, and the item unchecked (screenshot);
-#   4. Enter on it again: 3 rows, checked.
+#   4. Enter on it again: 3 rows, checked;
+#   5. Data, Delimiter: Auto chosen; Semicolon: the status says Semicolon, Semicolon
+#      chosen (screenshot); Comma: the status says Comma;
+#   6. started again, with an edit unsaved, Delimiter, Tab: an alert says to save first,
+#      and the status still says Comma (detected) (screenshot).
 # Needs docker. VERBOSE=1 prints the transcript; SHOTS=DIR saves the screenshots.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -40,12 +45,20 @@ run() {
   # The main menu open, Data'\''s submenu open, First Row Is Header focused (after the two
   # sort items).
   data() { keys -k F10; sleep 1; keys -k Return; sleep 1; keys -k Down -k Down -k Down; sleep 0.5; }
+  # Data, Delimiter'\''s submenu open (after First Row Is Header), its N-th item focused.
+  delim() {
+    data; keys -k Down -k Return; sleep 1
+    for i in $(seq $1); do keys -k Down; done; sleep 0.5
+  }
+  # The status bar'\''s delimiter ("Comma (detected)", "Semicolon").
+  sep() { ui text | grep -oE "^(Comma|Tab|Semicolon|Pipe)[^·]*" | head -1 | sed "s/ *$//"; }
   brick /tmp/people.csv >/tmp/brick.log 2>&1 &
   sleep 5
   swaymsg "[app_id=dev.cronkite.Brick] focus" >/dev/null; sleep 1
 
   echo "== 1 open"
   echo "button: $(ui item "Header row")"
+  echo "dropdown: $(ui text | grep -cx Auto)"
   echo "rows: $(rows)"
   shot 1-open
 
@@ -66,7 +79,33 @@ run() {
   echo "rows: $(rows)"
   data
   echo "item: $(ui item "First Row Is Header")"
-  keys -k Escape -k Escape -k Escape
+  keys -k Escape -k Escape -k Escape; sleep 0.5
+
+  echo "== 5 delimiter"
+  delim 4
+  echo "auto: $(ui item Auto)"
+  keys -k Return; sleep 1.5
+  echo "status: $(sep)"
+  delim 4
+  echo "semicolon: $(ui item Semicolon)"
+  shot 5-semicolon
+  keys -k Up -k Up -k Return; sleep 1.5
+  echo "status: $(sep)"
+
+  echo "== 6 unsaved"
+  # A closed menu gives the keys back to the main menu button: start again for the grid.
+  pkill -x brick; sleep 1
+  brick /tmp/people.csv >/tmp/brick.log 2>&1 &
+  sleep 5
+  swaymsg "[app_id=dev.cronkite.Brick] focus" >/dev/null; sleep 1
+  keys -k Down x -k Return; sleep 1
+  delim 3
+  keys -k Return; sleep 1.5
+  ui text | grep -x "Save your edits before changing the delimiter" | sed "s/^/alert: /"
+  shot 6-unsaved
+  keys -k Return; sleep 1
+  echo "status: $(sep)"
+  pkill -x brick
 }
 dbus-run-session -- bash -c "$(declare -f run); run" 2>&1
 ' 2>&1) || true
@@ -87,6 +126,13 @@ check "3 off" "rows: 4 rows"
 check "3 off" "item: unchecked"
 check "4 on" "rows: 3 rows"
 check "4 on" "item: checked"
+check "1 open" "dropdown: 0"
+check "5 delimiter" "auto: checked"
+check "5 delimiter" "semicolon: checked"
+check "5 delimiter" "status: Semicolon"
+check "5 delimiter" "status: Comma"
+check "6 unsaved" "alert: Save your edits before changing the delimiter"
+check "6 unsaved" "status: Comma (detected)"
 if [ $fails -gt 0 ]; then
   [ -z "${VERBOSE:-}" ] && printf '%s\n' "$out"
   echo "check_brick_data_menu: $fails of $checks checks failed"; exit 1

@@ -855,28 +855,45 @@ impl Session {
     }
 }
 
-/// Delimiter menu entries, in dropdown order.
-const DELIMITERS: [(&str, DelimiterChoice); 5] = [
-    ("Auto", DelimiterChoice::Auto),
-    ("Comma", DelimiterChoice::Fixed(b',')),
-    ("Tab", DelimiterChoice::Fixed(b'\t')),
-    ("Semicolon", DelimiterChoice::Fixed(b';')),
-    ("Pipe", DelimiterChoice::Fixed(b'|')),
+/// Data → Delimiter's items: label, `win.delimiter`'s target, and the choice.
+const DELIMITERS: [(&str, &str, DelimiterChoice); 5] = [
+    ("Auto", "auto", DelimiterChoice::Auto),
+    ("Comma", "comma", DelimiterChoice::Fixed(b',')),
+    ("Tab", "tab", DelimiterChoice::Fixed(b'\t')),
+    ("Semicolon", "semicolon", DelimiterChoice::Fixed(b';')),
+    ("Pipe", "pipe", DelimiterChoice::Fixed(b'|')),
 ];
 
-/// Delimiter dropdown (ENG-5): re-reads the open file with the chosen delimiter and
-/// re-indexes it in the background. Disabled while edits are unsaved, since edits are tied
-/// to the columns the old delimiter produced.
-fn delimiter_dropdown(session: &Rc<Session>, grid: &GridView) -> gtk::DropDown {
-    let names: Vec<&str> = DELIMITERS.iter().map(|(n, _)| *n).collect();
-    let dropdown = gtk::DropDown::from_strings(&names);
-    dropdown.set_tooltip_text(Some("Delimiter"));
-    dropdown.connect_selected_notify({
-        let (session, grid) = (session.clone(), grid.downgrade());
-        move |dd| {
-            let (Some(grid), Some(&(_, choice))) =
-                (grid.upgrade(), DELIMITERS.get(dd.selected() as usize))
-            else {
+/// `win.delimiter`'s target for `choice`.
+fn delimiter_target(choice: DelimiterChoice) -> &'static str {
+    DELIMITERS
+        .iter()
+        .find(|(_, _, c)| *c == choice)
+        .map_or("auto", |(_, t, _)| t)
+}
+
+/// Data → Delimiter (ENG-5, APP-10), `win.delimiter`, its state the chosen item's target:
+/// re-reads the open file with the chosen delimiter and re-indexes it in the background.
+/// Refused, saying why, while edits are unsaved, since edits are tied to the columns the
+/// old delimiter produced.
+fn delimiter_action(
+    session: &Rc<Session>,
+    grid: &GridView,
+    window: &gtk::ApplicationWindow,
+) -> gtk::gio::SimpleAction {
+    let action = gtk::gio::SimpleAction::new_stateful(
+        "delimiter",
+        Some(glib::VariantTy::STRING),
+        &delimiter_target(session.choice.get()).to_variant(),
+    );
+    action.connect_activate({
+        let (session, grid, window) = (session.clone(), grid.downgrade(), window.downgrade());
+        move |_, target| {
+            let target = target.and_then(|t| t.str());
+            let (Some(grid), Some(&(_, _, choice))) = (
+                grid.upgrade(),
+                DELIMITERS.iter().find(|(_, t, _)| Some(*t) == target),
+            ) else {
                 return;
             };
             if choice == session.choice.get() {
@@ -891,17 +908,15 @@ fn delimiter_dropdown(session: &Rc<Session>, grid: &GridView) -> gtk::DropDown {
                     grid.reset_column_widths();
                     grid.replace_workbook(session.workbook(table));
                 }
-                Err(RereadError::UnsavedEdits(_)) => {
-                    let current = DELIMITERS
-                        .iter()
-                        .position(|(_, c)| *c == session.choice.get())
-                        .unwrap_or(0);
-                    dd.set_selected(current as u32);
-                }
+                Err(RereadError::UnsavedEdits(_)) => alert(
+                    window.upgrade().as_ref().map(|w| w.upcast_ref()),
+                    "Save your edits before changing the delimiter",
+                    "Your edits belong to the columns the current delimiter makes.",
+                ),
             }
         }
     });
-    dropdown
+    action
 }
 
 /// Data → First Row Is Header (ENG-7, APP-10), `win.header-row`: whether the first row is
@@ -1001,13 +1016,14 @@ fn build_window(
             }
         ),
     );
-    let delimiter = delimiter_dropdown(session, &grid);
+    let delimiter = delimiter_action(session, &grid, &window);
+    window.add_action(&delimiter);
     let save = Rc::new(RefCell::new(SaveState::Idle));
     // The window's buttons. Linux: the header bar with Open, Recent, New, and Save As, then
-    // the main menu (Data, About), and the delimiter. macOS and Windows have those commands in
-    // the menu bar: the delimiter is a toolbar row over the format bar.
-    let toolbar = Toolbar::new();
+    // the main menu (Data, About). macOS and Windows have those commands in the menu bar,
+    // and no toolbar row.
     if !suite_ui::chrome::MENU_BAR {
+        let toolbar = Toolbar::new();
         let open = gtk::Button::from_icon_name("document-open-symbolic");
         open.set_tooltip_text(Some(&format!(
             "Open… ({})",
@@ -1028,13 +1044,10 @@ fn build_window(
         toolbar.pack_start(&new);
         toolbar.pack_start(&save_as_button);
         toolbar.pack_end(&suite_ui::chrome::main_menu(&menus::main_menu()));
+        toolbar.put_on(&window);
     }
-    toolbar.pack_end(&delimiter);
     let header_row = header_action(session, &grid);
     window.add_action(&header_row);
-    if let Some(row) = toolbar.put_on(&window) {
-        layout.attach(&row, 0, -1, 2, 1);
-    }
     // Another brick may have changed the recent files meanwhile (File → Open Recent).
     window.connect_is_active_notify(|window| {
         if window.is_active() {
@@ -1293,23 +1306,15 @@ fn build_window(
             if header_row.state().and_then(|v| v.get::<bool>()) != Some(grid.has_header()) {
                 header_row.set_state(&grid.has_header().to_variant());
             }
-            let can_switch =
-                grid.edit_count() == 0 && !matches!(*save.borrow(), SaveState::Saving(..));
-            // Only a CSV file has a delimiter to choose (XLSX-1).
-            delimiter.set_visible(grid.active_origin() == Origin::Csv);
-            delimiter.set_sensitive(can_switch);
-            delimiter.set_tooltip_text(Some(if can_switch {
-                "Delimiter"
-            } else {
-                "Delimiter (save your edits before changing it)"
-            }));
+            // Only a CSV file has a delimiter to choose (XLSX-1), and not while it saves.
+            delimiter.set_enabled(
+                grid.active_origin() == Origin::Csv
+                    && !matches!(*save.borrow(), SaveState::Saving(..)),
+            );
             // A Save As can change the delimiter choice.
-            let choice = DELIMITERS
-                .iter()
-                .position(|(_, c)| *c == session.choice.get())
-                .unwrap_or(0) as u32;
-            if delimiter.selected() != choice {
-                delimiter.set_selected(choice);
+            let choice = delimiter_target(session.choice.get());
+            if delimiter.state().as_ref().and_then(|v| v.str()) != Some(choice) {
+                delimiter.set_state(&choice.to_variant());
             }
             let shown = bar.update(&grid, &session, &save.borrow());
             find.tick(&grid);

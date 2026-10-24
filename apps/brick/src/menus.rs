@@ -184,14 +184,24 @@ pub fn menus() -> [(&'static str, gio::Menu); 5] {
     ]
 }
 
-/// Data: sorting, then First Row Is Header (APP-10), a check item on `win.header-row`.
+/// Data: sorting, then how a CSV file is read (APP-10): First Row Is Header, a check item
+/// on `win.header-row`, and Delimiter, radio items on `win.delimiter`.
 pub fn data() -> gio::Menu {
+    let delimiters = gio::Menu::new();
+    for (label, target, _) in crate::DELIMITERS {
+        let item = gio::MenuItem::new(Some(label), None);
+        item.set_action_and_target_value(Some("win.delimiter"), Some(&target.to_variant()));
+        delimiters.append_item(&item);
+    }
     menu(&[
         vec![
             item("Sort Ascending", "win.sort-asc", None),
             item("Sort Descending", "win.sort-desc", None),
         ],
-        vec![item("First Row Is Header", "win.header-row", None)],
+        vec![
+            item("First Row Is Header", "win.header-row", None),
+            gio::MenuItem::new_submenu(Some("Delimiter"), &delimiters),
+        ],
     ])
 }
 
@@ -317,6 +327,7 @@ pub fn add_window_actions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use data_model::DelimiterChoice;
     use suite_ui::chrome::items;
 
     #[test]
@@ -369,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn data_has_first_row_is_header() {
+    fn data_has_first_row_is_header_and_delimiter() {
         let want = (
             "First Row Is Header".to_owned(),
             Some("win.header-row".to_owned()),
@@ -381,5 +392,20 @@ mod tests {
         let at = |label: &str| main.iter().position(|(l, _, _)| l == label).unwrap();
         assert!(main.contains(&want));
         assert!(at("First Row Is Header") < at("About Brick"));
+        // Delimiter's items, each choosing its own.
+        for menu in [items(&bar()), main] {
+            let delimiters: Vec<_> = menu
+                .iter()
+                .filter(|(_, a, _)| a.as_deref() == Some("win.delimiter"))
+                .map(|(l, _, _)| l.as_str())
+                .collect();
+            assert_eq!(delimiters, ["Auto", "Comma", "Tab", "Semicolon", "Pipe"]);
+        }
+        let targets: Vec<_> = crate::DELIMITERS.iter().map(|(_, t, _)| *t).collect();
+        assert_eq!(targets, ["auto", "comma", "tab", "semicolon", "pipe"]);
+        assert_eq!(
+            crate::delimiter_target(DelimiterChoice::Fixed(b'\t')),
+            "tab"
+        );
     }
 }
