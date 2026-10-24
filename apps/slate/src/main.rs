@@ -112,6 +112,8 @@ fn main() -> glib::ExitCode {
         return glib::ExitCode::FAILURE;
     }
     eprintln!("{}", suite_ui::startup_message(APP));
+    // This run's part in applying updates (ADR 0012); before the bundle's environment.
+    let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
         Ok(Some(res)) => tracing::info!("running from the bundle {}", res.display()),
@@ -209,7 +211,9 @@ fn main() -> glib::ExitCode {
     app.connect_activate(|app| {
         suite_ui::launch::no_file(app, suite_platform::launch::when_finished, start_window)
     });
-    suite_ui::launch::run(&app, &files)
+    let code = suite_ui::launch::run(&app, &files);
+    updates.exit();
+    code
 }
 
 /// The window already showing `path`, if any.

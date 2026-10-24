@@ -30,7 +30,7 @@ Everything below about stories, invariants, crates, benchmarks, and ADRs is Bric
 ## Suite rules
 
 - Shared crates live in `crates/suite-*`; each app's own crates live under `apps/<app>/crates/`.
-- `suite-core` depends on nothing in the workspace; within the workspace, `suite-ui`, `suite-platform`, and `suite-file` may depend only on `suite-core`, and `suite-update` only on `suite-core` and `suite-platform`. No shared crate depends on an app or an app's crates.
+- `suite-core` depends on nothing in the workspace; within the workspace, `suite-ui`, `suite-platform`, and `suite-file` may depend only on `suite-core`, and `suite-update` only on `suite-core`, `suite-platform`, and `suite-file` (ADR 0012). No shared crate depends on an app or an app's crates.
 - The suite's UI toolkit is GTK 4 (`docs/adr/0002-gtk4-for-the-suite.md`), declared once as `gtk` in `[workspace.dependencies]`. Only apps, `suite-ui`, and `suite-platform` may depend on it; `suite-core`, `suite-file`, `suite-update`, and engine crates stay toolkit-free.
 - Code becomes shared only when at least two apps genuinely need it. Share infrastructure, not product models.
 - Suite-wide decisions go in `docs/adr/NNNN-title.md`.

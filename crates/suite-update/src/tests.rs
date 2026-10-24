@@ -152,6 +152,7 @@ impl World {
             keys: vec![keys::key_of(keys::TEST_PEM)],
             platform: manifest::PLATFORM.into(),
             updates: self.dir.path().join("updates"),
+            apply: false,
         }
     }
 

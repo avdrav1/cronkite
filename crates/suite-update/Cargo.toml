@@ -15,6 +15,7 @@ test-key = []
 
 [dependencies]
 suite-core.workspace = true
+suite-file.workspace = true
 suite-platform.workspace = true
 tracing.workspace = true
 serde.workspace = true
@@ -25,6 +26,11 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # Ed25519 signatures and SHA-256; base64 for the signature and the keys' PEM files.
 ring = "0.17"
 base64 = "0.23"
+
+# Unpacking the Linux and macOS release tarballs (.tar.gz) to apply them (UPD-4, UPD-5).
+[target.'cfg(not(windows))'.dependencies]
+tar = { version = "0.4", default-features = false }
+flate2 = "1"
 
 [lints]
 workspace = true

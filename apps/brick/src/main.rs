@@ -147,6 +147,8 @@ fn main() -> glib::ExitCode {
         .init();
     tracing::info!("application starting");
     eprintln!("{}", suite_ui::startup_message(APP));
+    // This run's part in applying updates (ADR 0012); before the bundle's environment.
+    let updates = suite_update::launch(APP, env!("CARGO_PKG_VERSION"));
     // Before the file's indexing threads start: these may set the environment (macOS).
     // In a macOS app bundle, GTK and its libraries find their files there (MAC-7).
     match suite_platform::bundle::init(APP) {
@@ -283,7 +285,9 @@ fn main() -> glib::ExitCode {
             start_window(app);
         })
     });
-    suite_ui::launch::run(&app, args.file.as_slice())
+    let code = suite_ui::launch::run(&app, args.file.as_slice());
+    updates.exit();
+    code
 }
 
 /// Map `path` and start indexing it; an .xlsx file starts importing (XLSX-1), and the

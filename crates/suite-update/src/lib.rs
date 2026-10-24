@@ -16,9 +16,11 @@
 //! crates. HTTPS is `ureq` on `rustls` with `ring`, certificates checked by the system's
 //! verifier; `ring` also checks the signature and the SHA-256.
 
+mod apply;
 pub mod install;
 pub mod keys;
 pub mod manifest;
+pub mod session;
 pub mod stage;
 
 use std::ffi::OsStr;
@@ -29,6 +31,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use suite_core::AppKind;
 
+pub use session::{launch, notice, Session};
 pub use stage::{staged, Staged};
 
 /// Why a check stopped without staging anything.
@@ -111,6 +114,9 @@ pub struct Check {
     pub platform: String,
     /// The updates folder ([`updates_dir`]).
     pub updates: PathBuf,
+    /// Whether a release staged now or earlier is applied after the check (Linux, UPD-4):
+    /// the running app's checks do; tests of the check alone don't.
+    pub apply: bool,
 }
 
 /// What decides whether a check may fetch anything.
@@ -161,7 +167,11 @@ fn run(c: &Check) -> Result<Outcome, Problem> {
     if !manifest::newer(&release.version, &c.running) {
         return Ok(Outcome::UpToDate);
     }
-    stage::stage(&c.updates, &release, |url, out| download(&agent, url, out))
+    let outcome = stage::stage(&c.updates, &release, |url, out| download(&agent, url, out))?;
+    if let Some(s) = stage::staged(&c.updates).filter(|s| c.apply && s.version == release.version) {
+        apply::after_check(c.app, &c.updates, &s);
+    }
+    Ok(outcome)
 }
 
 /// The HTTP client: rustls on ring, the system's certificate verifier, timeouts that end a
@@ -284,6 +294,7 @@ pub fn start(app: AppKind, running: &'static str) {
                 keys: keys::trusted(),
                 platform: manifest::PLATFORM.to_owned(),
                 updates: updates_dir(app),
+                apply: true,
             };
             match check(&gate, &c) {
                 Ok(Outcome::Staged(v)) => {
