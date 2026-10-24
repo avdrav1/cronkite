@@ -1,0 +1,112 @@
+# UPD-7: the apps update themselves in the wild. A live release of each app (FROM, the first
+# with the updater by default) is installed on a clean macOS and Windows runner by its real
+# installer, from https://<app>.cronkite.cc, which reads a latest.json pinned to FROM's live
+# files (scripts/pin_release.py, the pin job); then the installed app, a release build with
+# no CRONKITE_UPDATE_URL and no test key, checks https://dl.cronkite.cc's signed latest.json.
+# With expect_update 1 (the default) it must update itself to the live latest, recorded with
+# `--version` before and after and a screenshot of the "Updated to <App> X.Y.Z" banner; with
+# 0 it must find FROM up to date (the release before the next one is out). Linux's twin is
+# scripts/check_update_live.sh. Screenshots, logs, and summaries: the update-live artifact.
+name: update-live
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Apps to check (brick slate frame etch)"
+        default: "brick slate frame etch"
+      brick:
+        description: "Brick's release to install first"
+        default: "0.6.0"
+      slate:
+        description: "Slate's release to install first"
+        default: "0.6.0"
+      frame:
+        description: "Frame's release to install first"
+        default: "0.4.0"
+      etch:
+        description: "Etch's release to install first"
+        default: "0.5.0"
+      expect_update:
+        description: "1: a newer release must be live and installed; 0: FROM must be the live latest"
+        type: choice
+        options: ["1", "0"]
+        default: "1"
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      apps: ${{ steps.pin.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pin
+        name: A latest.json pinned to each FROM, and the live installers
+        env:
+          INPUT_APPS: ${{ inputs.apps }}
+          FROM_BRICK: ${{ inputs.brick }}
+          FROM_SLATE: ${{ inputs.slate }}
+          FROM_FRAME: ${{ inputs.frame }}
+          FROM_ETCH: ${{ inputs.etch }}
+        run: |
+          set -euo pipefail
+          specs=""
+          for a in $INPUT_APPS; do
+            case $a in brick|slate|frame|etch) ;; *) echo "unknown app $a"; exit 1 ;; esac
+            var=FROM_$(echo "$a" | tr a-z A-Z)
+            specs="$specs $a:${!var}"
+          done
+          python3 scripts/pin_release.py site $specs
+          echo "apps=$INPUT_APPS" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: pinned-site, path: site, if-no-files-found: error }
+  macos:
+    needs: pin
+    runs-on: macos-14
+    timeout-minutes: 60
+    defaults: { run: { shell: bash } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: pinned-site, path: site }
+      - name: Move Homebrew away
+        run: sudo mv /opt/homebrew /opt/homebrew-away
+      - name: Install FROM, let it update itself from the live latest.json
+        env:
+          EXPECT_UPDATE: ${{ inputs.expect_update }}
+          OUT_CHECK: out/update-live/macos
+        run: scripts/check_mac_update_live.sh site ${{ needs.pin.outputs.apps }}
+      - name: Homebrew back
+        if: always()
+        run: if [ -d /opt/homebrew-away ]; then sudo mv /opt/homebrew-away /opt/homebrew; fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: update-live-macos, path: out/update-live, if-no-files-found: warn }
+  windows:
+    needs: pin
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: pinned-site, path: site }
+      - name: Move MSYS2 away
+        shell: pwsh
+        run: if (Test-Path C:\msys64) { Rename-Item C:\msys64 C:\msys64-away }
+      - name: Install FROM, let it update itself from the live latest.json
+        shell: powershell
+        run: '& .\scripts\check_win_update_live.ps1 -Site site -Apps "${{ needs.pin.outputs.apps }}" -ExpectUpdate "${{ inputs.expect_update }}" -Out out\update-live\windows'
+      - name: MSYS2 back
+        if: always()
+        shell: pwsh
+        run: if (Test-Path C:\msys64-away) { Rename-Item C:\msys64-away C:\msys64 }
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: update-live-windows, path: out/update-live, if-no-files-found: warn }
+  update-live:
+    # One artifact: macos/ and windows/, each with shots/, logs/, and summary.txt.
+    needs: [macos, windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact/merge@v4
+        with: { name: update-live, pattern: "update-live-*", delete-merged: true }
