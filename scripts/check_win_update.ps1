@@ -244,7 +244,7 @@ function Wait-Log([string]$file, [string]$pattern, [int]$seconds = 120) {
 }
 function Log-Line([string]$file, [string]$pattern) {
     $line = ((Read-Log $file) -split "`r?`n" | Where-Object { $_ -match $pattern } | Select-Object -First 1)
-    if ($line) { return ($line -replace '^.*?(update: )', '$1').Trim() } else { return "(none)" }
+    if ($line) { return ($line -replace '^.*?\supdate: ', 'update: ').Trim() } else { return "(none)" }
 }
 
 # The installed app, started as a user would, with CRONKITE_UPDATE_URL naming $url; its
