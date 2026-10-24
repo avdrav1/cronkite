@@ -50,7 +50,7 @@ On macOS, Command replaces Ctrl in every shortcut (⌘S, ⌘Z, ⌘C, ⌘Home, �
 
 Resize a column or row by dragging its border in the column letters or row numbers; selected whole columns resize together. Double-click a column border to fit the text on screen, or a row border to restore its height. Sizes stay with their rows and columns through inserts, deletes, undo, and saving, and last while the window is open (CSV has nowhere to store them).
 
-A header row is detected on open: when the first row names the columns, it becomes the column titles (next to the letters) and isn't counted as data. The **Header row** button in the header bar flips it; your choice holds when the delimiter changes or the file is saved. The file itself never changes: a save writes the first row as it is.
+A header row is detected on open: when the first row names the columns, it becomes the column titles (next to the letters) and isn't counted as data. **Data → First Row Is Header** flips it (on Linux, Data is in the main menu, ☰); your choice holds when the delimiter changes or the file is saved. The file itself never changes: a save writes the first row as it is.
 
 ## Layout
 

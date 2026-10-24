@@ -1,7 +1,8 @@
 //! Brick's menus (MAC-4, WIN-3). On macOS and Windows the menu bar has File, Edit, Sheet,
 //! Format, and Data, each item with its key from [`crate::keys`], running the window's
 //! actions ([`add_window_actions`]) and the app's. Linux has the header bar's buttons
-//! instead; its recent files menu and File → Open Recent are both [`fill_recent`].
+//! instead, with Data in its main menu; its recent files menu and File → Open Recent are
+//! both [`fill_recent`].
 
 use crate::grid_view::{FontToggle, GridView};
 use crate::keys::{self, Command};
@@ -173,10 +174,7 @@ pub fn menus() -> [(&'static str, gio::Menu); 5] {
             item("Unmerge Cells", "win.unmerge", None),
         ],
     ]);
-    let data = menu(&[vec![
-        item("Sort Ascending", "win.sort-asc", None),
-        item("Sort Descending", "win.sort-desc", None),
-    ]]);
+    let data = data();
     [
         ("File", file),
         ("Edit", edit),
@@ -184,6 +182,28 @@ pub fn menus() -> [(&'static str, gio::Menu); 5] {
         ("Format", format),
         ("Data", data),
     ]
+}
+
+/// Data: sorting, then First Row Is Header (APP-10), a check item on `win.header-row`.
+pub fn data() -> gio::Menu {
+    menu(&[
+        vec![
+            item("Sort Ascending", "win.sort-asc", None),
+            item("Sort Descending", "win.sort-desc", None),
+        ],
+        vec![item("First Row Is Header", "win.header-row", None)],
+    ])
+}
+
+/// Linux's main menu in a document's window: Data, then the app's section (About, Update
+/// Automatically).
+pub fn main_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    let section = gio::Menu::new();
+    section.append_submenu(Some("Data"), &data());
+    menu.append_section(None, &section);
+    menu.append_section(None, &suite_ui::chrome::app_section(crate::APP));
+    menu
 }
 
 /// The menu bar: the menus, then macOS's Window menu or Windows' Help menu.
@@ -206,8 +226,8 @@ fn add(
     window.add_action(&action);
 }
 
-/// The window's actions the menu bar's items run (macOS, Windows; on Linux nothing shows
-/// them). `run` does a window command as its key does.
+/// The window's actions the menu bar's items run (macOS, Windows; on Linux the main menu's
+/// Data shows its own). `run` does a window command as its key does.
 pub fn add_window_actions(
     window: &gtk::ApplicationWindow,
     grid: &GridView,
@@ -346,5 +366,20 @@ mod tests {
             assert!(all.contains(&("Exit".to_owned(), Some("app.quit".to_owned()), None)));
         }
         assert_eq!(top, want);
+    }
+
+    #[test]
+    fn data_has_first_row_is_header() {
+        let want = (
+            "First Row Is Header".to_owned(),
+            Some("win.header-row".to_owned()),
+            None,
+        );
+        assert!(items(&bar()).contains(&want));
+        // Linux's main menu has Data too, before About.
+        let main = items(&main_menu());
+        let at = |label: &str| main.iter().position(|(l, _, _)| l == label).unwrap();
+        assert!(main.contains(&want));
+        assert!(at("First Row Is Header") < at("About Brick"));
     }
 }

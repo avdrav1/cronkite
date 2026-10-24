@@ -25,7 +25,7 @@ None; decided with the user while planning M5 from API research (calamine 0.36.1
 **Option A.**
 
 1. **Sheets are `CsvTable`s.** An XLSX sheet is imported by streaming its cells (`XlsxCellReader::next_cell_with_formula`) into a CSV copy in the cache directory (the mechanism of `csv_engine::open_text_as` for decoded copies), mapped and indexed like any CSV. Overlay edits, row map, sort, filter, find, copy, paste, undo, and save work unchanged per sheet. Imported copies are comma-separated, `"`-quoted, LF, no header.
-2. **References address file rows.** `A1` is the first line of the sheet (the header row when "Header row" is on), as in Excel and Calc. The row gutter shows file row numbers, and draws `1` in the top-left corner when the header row is on, so typed references match what the user sees. Toggling the header row never changes what a formula means. Columns are view positions (`A` is the first column shown).
+2. **References address file rows.** `A1` is the first line of the sheet (the header row when "First Row Is Header" is on), as in Excel and Calc. The row gutter shows file row numbers, and draws `1` in the top-left corner when the header row is on, so typed references match what the user sees. Toggling the header row never changes what a formula means. Columns are view positions (`A` is the first column shown).
 3. **One workbook per window** (ADR 0008): a `Workbook` holds the sheets, the active sheet, defined names, and the calculation cache.
 
 ## Consequences

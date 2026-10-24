@@ -904,24 +904,23 @@ fn delimiter_dropdown(session: &Rc<Session>, grid: &GridView) -> gtk::DropDown {
     dropdown
 }
 
-/// "Header row" toggle (ENG-7): whether the first row is column titles or data. Starts as
-/// detected; flipping it is the user's choice for this file from then on.
-fn header_toggle(session: &Rc<Session>, grid: &GridView) -> gtk::ToggleButton {
-    let toggle = gtk::ToggleButton::with_label("Header row");
-    toggle.set_tooltip_text(Some("First row is header"));
-    toggle.set_active(grid.has_header());
-    toggle.connect_toggled({
+/// Data → First Row Is Header (ENG-7, APP-10), `win.header-row`: whether the first row is
+/// column titles or data, its state the check mark. Starts as detected; flipping it is the
+/// user's choice for this file from then on.
+fn header_action(session: &Rc<Session>, grid: &GridView) -> gtk::gio::SimpleAction {
+    let action =
+        gtk::gio::SimpleAction::new_stateful("header-row", None, &grid.has_header().to_variant());
+    action.connect_activate({
         let (session, grid) = (session.clone(), grid.downgrade());
-        move |t| {
+        move |action, _| {
             let Some(grid) = grid.upgrade() else { return };
-            // The status tick also sets the toggle to match the grid; only a real flip counts.
-            if t.is_active() != grid.has_header() {
-                grid.set_header(t.is_active());
-                session.header.set(Some(t.is_active()));
-            }
+            let on = !grid.has_header();
+            grid.set_header(on);
+            session.header.set(Some(on));
+            action.set_state(&on.to_variant());
         }
     });
-    toggle
+    action
 }
 
 fn build_window(
@@ -1005,8 +1004,8 @@ fn build_window(
     let delimiter = delimiter_dropdown(session, &grid);
     let save = Rc::new(RefCell::new(SaveState::Idle));
     // The window's buttons. Linux: the header bar with Open, Recent, New, and Save As, then
-    // the main menu, the delimiter, and Header row. macOS and Windows have those commands in the menu bar:
-    // the delimiter and Header row are a toolbar row over the format bar.
+    // the main menu (Data, About), and the delimiter. macOS and Windows have those commands in
+    // the menu bar: the delimiter is a toolbar row over the format bar.
     let toolbar = Toolbar::new();
     if !suite_ui::chrome::MENU_BAR {
         let open = gtk::Button::from_icon_name("document-open-symbolic");
@@ -1028,11 +1027,11 @@ fn build_window(
         toolbar.pack_start(&recent_menu());
         toolbar.pack_start(&new);
         toolbar.pack_start(&save_as_button);
-        toolbar.pack_end(&main_menu());
+        toolbar.pack_end(&suite_ui::chrome::main_menu(&menus::main_menu()));
     }
     toolbar.pack_end(&delimiter);
-    let header_row = header_toggle(session, &grid);
-    toolbar.pack_end(&header_row);
+    let header_row = header_action(session, &grid);
+    window.add_action(&header_row);
     if let Some(row) = toolbar.put_on(&window) {
         layout.attach(&row, 0, -1, 2, 1);
     }
@@ -1291,8 +1290,8 @@ fn build_window(
                 );
             }
             // Detection runs again when the file is re-read (delimiter change, save).
-            if header_row.is_active() != grid.has_header() {
-                header_row.set_active(grid.has_header());
+            if header_row.state().and_then(|v| v.get::<bool>()) != Some(grid.has_header()) {
+                header_row.set_state(&grid.has_header().to_variant());
             }
             let can_switch =
                 grid.edit_count() == 0 && !matches!(*save.borrow(), SaveState::Saving(..));
