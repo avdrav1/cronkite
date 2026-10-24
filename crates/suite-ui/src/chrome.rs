@@ -121,20 +121,29 @@ fn update_action(update: AutoUpdate) -> gio::SimpleAction {
 /// (`/org/gtk/libgtk/ui/gtkapplication-quartz.ui`) and has no API to add to it, so this
 /// registers a copy with the item (`data/gtkapplication-quartz.ui`, compiled by
 /// `build.rs`) over GTK's: GLib looks a path up in the resource registered last first.
-/// GTK registers its own in `gtk_init`, and reads the menu at the application's startup,
-/// so this initialises GTK first; call it after the environment GTK reads is set, before
-/// the application runs ([`crate::launch::run`] does). GTK keeps the item in its menu as
-/// it rebuilds the menu bar, its check mark following the action's state.
+/// GTK's own are registered in `gtk_init`, or, compiled in as static resources, at the
+/// first lookup, each then going ahead of those registered before; GTK reads the menu at
+/// the application's startup. So this initialises GTK and looks the menu up before
+/// registering the copy; call it after the environment GTK reads is set, before the
+/// application runs ([`crate::launch::run`] does). GTK keeps the item in its menu as it
+/// rebuilds the menu bar, its check mark following the action's state.
 #[cfg(target_os = "macos")]
 pub(crate) fn macos_app_menu() {
+    const PATH: &str = "/org/gtk/libgtk/ui/gtkapplication-quartz.ui";
     static MENU: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app-menu.gresource"));
     if let Err(e) = gtk::init() {
         tracing::warn!("app menu: {e}");
         return;
     }
+    let lookup = || gio::resources_lookup_data(PATH, gio::ResourceLookupFlags::NONE);
+    let _ = lookup();
     match gio::Resource::from_data(&glib::Bytes::from_static(MENU)) {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::warn!("app menu: {e}"),
+    }
+    let ours = lookup().is_ok_and(|menu| menu.windows(20).any(|w| w == b"update-automatically"));
+    if !ours {
+        tracing::warn!("app menu: GTK's own is still the one found, without Update Automatically");
     }
 }
 
