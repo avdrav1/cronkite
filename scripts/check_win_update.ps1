@@ -42,11 +42,12 @@ param(
 )
 $ErrorActionPreference = "Continue"
 $root = (Resolve-Path "$PSScriptRoot\..").Path
-$Old = (Resolve-Path $Old).Path
-$Site = (Resolve-Path $Site).Path
+# (PowerShell's names ignore case: $Old and $Site are read here once, never as $old or $site.)
+$oldBuilds = (Resolve-Path $Old).Path
+$newSite = (Resolve-Path $Site).Path
 foreach ($d in "shots", "logs", "files", "site") { New-Item -ItemType Directory -Force "$Out\$d" | Out-Null }
 $Out = (Resolve-Path $Out).Path
-$shots = "$Out\shots"; $logs = "$Out\logs"; $files = "$Out\files"; $site = "$Out\site"
+$shots = "$Out\shots"; $logs = "$Out\logs"; $files = "$Out\files"; $www = "$Out\site"
 $summary = "$Out\summary.txt"
 Set-Content -Encoding utf8 $summary ""
 $script:failed = $false
@@ -155,25 +156,25 @@ Note "Windows $([Environment]::OSVersion.Version)"
 # and a latest.json whose signature no longer verifies.
 $port = 8765
 $base = "http://127.0.0.1:$port"
-Copy-Item -Recurse -Force "$Site\*" $site
+Copy-Item -Recurse -Force "$newSite\*" $www
 $olds = @{}; $news = @{}; $setups = @{}
 foreach ($app in $Apps -split '\s+' | Where-Object { $_ }) {
-    $oldSetup = Get-ChildItem "$Old\$app-*-x86_64-windows-setup.exe" | Select-Object -First 1
-    $latest = "$site\$app\latest.json"
-    if (-not $oldSetup -or -not (Test-Path $latest) -or -not (Test-Path "$latest.sig")) { Fail "${app}: no old Setup.exe in $Old or no signed latest.json in $Site\$app"; continue }
+    $oldSetup = Get-ChildItem "$oldBuilds\$app-*-x86_64-windows-setup.exe" | Select-Object -First 1
+    $latest = "$www\$app\latest.json"
+    if (-not $oldSetup -or -not (Test-Path $latest) -or -not (Test-Path "$latest.sig")) { Fail "${app}: no old Setup.exe in $oldBuilds or no signed latest.json in $newSite\$app"; continue }
     $old = $oldSetup.Name -replace "^$app-(.+)-x86_64-windows-setup\.exe$", '$1'
     $text = [IO.File]::ReadAllText($latest)
     $release = $text | ConvertFrom-Json
     $new = $release.version
     $win = $release.platforms.'windows-x86_64'
-    $setup = "$site\$app\releases\v$new\$([IO.Path]::GetFileName(([uri]$win.url).AbsolutePath))"
+    $setup = "$www\$app\releases\v$new\$([IO.Path]::GetFileName(([uri]$win.url).AbsolutePath))"
     $sha = if (Test-Path $setup) { (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant() } else { "" }
     $ok = $release.app -eq $app -and $win.url -like "$base/$app/releases/v$new/*" -and $sha -eq $win.sha256 -and $old -ne $new
     Check $ok "${app}: the site offers $app $new (signed latest.json naming $($win.url), sha256 $($win.sha256.Substring(0, 12))...) over the installed $old"
     if (-not $ok) { continue }
     $olds[$app] = $old; $news[$app] = $new; $setups[$app] = $setup
 
-    $dir = "$site\$app-old"
+    $dir = "$www\$app-old"
     New-Item -ItemType Directory -Force "$dir\releases\v$old" | Out-Null
     Copy-Item "$root\sites\$app\install.ps1" "$dir\install.ps1"
     Copy-Item $oldSetup.FullName "$dir\releases\v$old\$($oldSetup.Name)"
@@ -187,14 +188,14 @@ foreach ($app in $Apps -split '\s+' | Where-Object { $_ }) {
     [IO.File]::WriteAllText("$dir\latest.json", ($oldRelease | ConvertTo-Json -Compress -Depth 4))
 
     # One byte of the signed manifest changed: a newer version than it was signed for.
-    $dir = "$site\$app-badsig"
+    $dir = "$www\$app-badsig"
     New-Item -ItemType Directory -Force $dir | Out-Null
     $bad = $text.Replace("`"version`":`"$new`"", "`"version`":`"$new.1`"")
     [IO.File]::WriteAllText("$dir\latest.json", $bad)
     Copy-Item "$latest.sig" "$dir\latest.json.sig"
 }
 
-$server = Start-Job -ArgumentList $site, $port -ScriptBlock {
+$server = Start-Job -ArgumentList $www, $port -ScriptBlock {
     param($root, $port)
     $l = New-Object Net.HttpListener
     $l.Prefixes.Add("http://127.0.0.1:$port/")
