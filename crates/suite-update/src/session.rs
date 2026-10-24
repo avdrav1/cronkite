@@ -56,8 +56,12 @@ pub fn launch(app: AppKind, running: &'static str) -> Session {
 impl Session {
     /// Call when the app's last window has closed and `main` is about to return: applies
     /// what only an exit can (macOS's bundle swap, Windows' Setup) when no other instance
-    /// of the app is running.
+    /// of the app is running, unless "Update Automatically" was turned off meanwhile.
     pub fn exit(self) {
+        if self.updates.is_some() && !crate::automatic(self.app) {
+            tracing::debug!("update: {:?}", Skip::SettingOff);
+            return;
+        }
         crate::apply::at_exit(&self);
     }
 }
