@@ -5,10 +5,10 @@
 //! ([`main_menu`]) with "Update Automatically" and About ([`app_section`]); Slate's menus
 //! are in that menu too, and Etch shows its menu bar in the window, with Help holding
 //! the same two items ([`help_menu`]). On macOS the app's menus are in the menu bar
-//! ([`menu_bar`]), after the app menu GTK makes there (About, Update Automatically,
-//! Settings, Services, Hide ⌘H, Hide Others ⌥⌘H, Show All, Quit ⌘Q, whose About, Update
-//! Automatically, and Quit run `app.about`, `app.update-automatically`, and `app.quit`;
-//! `macos_app_menu`) and before a Window menu (Minimize ⌘M, Zoom, then the windows,
+//! ([`menu_bar`]), after the suite's app menu, which GTK builds there (About, Update
+//! Automatically, Services, Hide ⌘H, Hide Others ⌥⌘H, Show All, Quit ⌘Q, whose About,
+//! Update Automatically, and Quit run `app.about`, `app.update-automatically`, and
+//! `app.quit`; `macos_app_menu`) and before a Window menu (Minimize ⌘M, Zoom, then the windows,
 //! which AppKit lists). On Windows each window shows the same menus in a menu bar row
 //! under its title bar (GTK's `GtkApplicationWindow` puts the app's menu bar there),
 //! followed by Help with Update Automatically and About, and File ends with Exit
@@ -116,17 +116,18 @@ fn update_action(update: AutoUpdate) -> gio::SimpleAction {
     action
 }
 
-/// macOS: the app menu GTK makes gets "Update Automatically" after "About `<App>`", a check
-/// item for `app.update-automatically`. GTK 4 builds that menu from its own resource
-/// (`/org/gtk/libgtk/ui/gtkapplication-quartz.ui`) and has no API to add to it, so this
-/// registers a copy with the item (`data/gtkapplication-quartz.ui`, compiled by
-/// `build.rs`) over GTK's: GLib looks a path up in the resource registered last first.
-/// GTK's own are registered in `gtk_init`, or, compiled in as static resources, at the
-/// first lookup, each then going ahead of those registered before; GTK reads the menu at
-/// the application's startup. So this initialises GTK and looks the menu up before
-/// registering the copy; call it after the environment GTK reads is set, before the
-/// application runs ([`crate::launch::run`] does). GTK keeps the item in its menu as it
-/// rebuilds the menu bar, its check mark following the action's state.
+/// macOS: the suite's app menu (`data/app-menu.ui`: About `<App>`, Update Automatically,
+/// Services, Hide, Hide Others, Show All, Quit), with "Update Automatically" a check item
+/// for `app.update-automatically`. GTK 4's macOS backend builds the app menu from the
+/// resource `/org/gtk/libgtk/ui/gtkapplication-quartz.ui` and has no API to add to it, so
+/// `build.rs` compiles the suite's menu to that path and this registers it ahead of GTK's
+/// own: GLib looks a path up in the resource registered last first. GTK's resources are
+/// registered in `gtk_init`, or, compiled in as static resources, at the first lookup,
+/// each then going ahead of those registered before; GTK reads the menu at the
+/// application's startup. So this initialises GTK and looks the path up before
+/// registering; call it after the environment GTK reads is set, before the application
+/// runs ([`crate::launch::run`] does). GTK keeps the item in its menu as it rebuilds the
+/// menu bar, its check mark following the action's state.
 #[cfg(target_os = "macos")]
 pub(crate) fn macos_app_menu() {
     const PATH: &str = "/org/gtk/libgtk/ui/gtkapplication-quartz.ui";

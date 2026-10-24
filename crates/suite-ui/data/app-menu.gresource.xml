@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- macOS: the app menu GTK 4 builds, with Update Automatically (build.rs compiles it). -->
+<!-- macOS: the suite's app menu (app-menu.ui) at the path GTK's macOS backend reads it
+     from; build.rs compiles it. -->
 <gresources>
   <gresource prefix="/org/gtk/libgtk/ui">
-    <file>gtkapplication-quartz.ui</file>
+    <file alias="gtkapplication-quartz.ui">app-menu.ui</file>
   </gresource>
 </gresources>

@@ -88,7 +88,7 @@ Tool keys and X work only while no text is being typed (the size field included)
 
 On macOS, Command replaces Ctrl in every shortcut, Ctrl+wheel and Ctrl+Home and Ctrl+End in text included (⌘S, ⇧⌘S, ⌘+, ⌘-wheel), and the menus show them so (MAC-3). Redo is ⇧⌘Z (Ctrl+Y is Linux's alone), and Rotate 90° Right is ⌘] (Pixelmator's), as ⌘H hides the app; nothing stays on Control.
 
-On macOS the menu bar is the system's (MAC-4): GTK's app menu (About Etch, Update Automatically, Settings, Services, Hide, Quit ⌘Q), then File, Edit, View, and Image, and Window (Minimize ⌘M, Zoom, the windows). File has no Quit there, as the app menu has it. Windows keep macOS's title bar.
+On macOS the menu bar is the system's (MAC-4): the app menu (About Etch, Update Automatically, Services, Hide, Quit ⌘Q), then File, Edit, View, and Image, and Window (Minimize ⌘M, Zoom, the windows). File has no Quit there, as the app menu has it. Windows keep macOS's title bar.
 
 On Windows (WIN-3) each window has Windows' own title bar (minimize, maximize, close, snapping) and the menu bar under it, as on Linux, with Help (Update Automatically, About Etch) after Image; File ends with Exit instead of Quit. Etch is a GUI program there, so no console window opens with it, and `etch --version` still prints in the terminal it was started from (after the next prompt) or into a file or pipe. It follows Windows' app mode, light or dark, the title bar too, also when it changes while Etch runs. Shortcuts stay Control.
 
